@@ -502,7 +502,7 @@ export default function AnonymousReport() {
 
       {/* Success Dialog Popup */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="w-full max-w-[380px] bg-card p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
+        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-[380px] bg-card p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
           <img src="/success.svg" alt="Success" className="w-32 h-32 object-contain" />
           <div className="space-y-2">
             <DialogTitle className="text-xl font-bold tracking-tight text-slate-800">
