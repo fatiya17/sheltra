@@ -191,7 +191,8 @@ export default function AnonymousReport() {
 
                 <div className="pt-2 flex items-center justify-between">
                   <div className="flex items-center text-xs text-muted-foreground gap-1">
-                    <Lock className="w-3.5 h-3.5 text-emerald-600" /> Enkripsi End-to-End & Terlindungi
+                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden md:inline">Enkripsi End-to-End & Terlindungi</span>
                   </div>
                   <Button type="submit" className="flex items-center gap-2">
                     <Send className="w-4 h-4" /> Kirim Laporan Anonim
