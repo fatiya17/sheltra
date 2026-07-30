@@ -1,7 +1,7 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
+// kotak panel penampung grup informasi (seperti kartu biodata atau kartu barang)
 function Card({
   className,
   size = "default",
@@ -19,6 +19,7 @@ function Card({
   );
 }
 
+// bagian atas kartu untuk menampilkan identitas kartu
 function CardHeader({
   className,
   ...props
@@ -34,6 +35,7 @@ function CardHeader({
   );
 }
 
+// teks judul utama di atas kartu
 function CardTitle({
   className,
   ...props
@@ -49,6 +51,7 @@ function CardTitle({
   );
 }
 
+// teks keterangan/deskripsi di bawah judul kartu
 function CardDescription({
   className,
   ...props
@@ -61,6 +64,7 @@ function CardDescription({
   );
 }
 
+// area penempatan tombol aksi di sudut kartu
 function CardAction({
   className,
   ...props
@@ -76,6 +80,7 @@ function CardAction({
   );
 }
 
+// area isi konten utama kartu
 function CardContent({
   className,
   ...props
@@ -88,6 +93,7 @@ function CardContent({
   );
 }
 
+// bagian bawah kartu untuk tombol persetujuan atau aksi lanjut
 function CardFooter({
   className,
   ...props
