@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
+// judul nama input form (seperti label 'nama lengkap' di atas kolom input)
 function Label({
   className,
   ...props
