@@ -1,3 +1,6 @@
+@import '@astryxdesign/core/reset.css';
+@import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -127,4 +130,24 @@
   html {
     @apply font-sans;
   }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Lightbox Backdrop Blur Override */
+dialog.astryx-lightbox::backdrop,
+.astryx-lightbox::backdrop {
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  background-color: rgba(15, 23, 42, 0.4) !important;
+  transition: backdrop-filter 300ms ease-out, opacity 300ms ease-out !important;
+}
+
+/* Make lightbox icon buttons slightly rounded */
+dialog.astryx-lightbox button,
+.astryx-lightbox button,
+.astryx-lightbox .astryx-icon-button {
+  border-radius: 8px !important;
 }
