@@ -1,144 +1,214 @@
 "use client"
 
 import * as React from "react"
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Dialog({
-  ...props
-}) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
-}
+const DialogContext = React.createContext(null)
 
-function DialogTrigger({
-  ...props
-}) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
+// pembungkus modal pop-up melayang layar penuh
+function Dialog({ open, onOpenChange, children }) {
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [open])
 
-function DialogPortal({
-  ...props
-}) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
-}
-
-function DialogClose({
-  ...props
-}) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
-}
-
-function DialogOverlay({
-  className,
-  ...props
-}) {
   return (
-    <DialogPrimitive.Backdrop
-      data-slot="dialog-overlay"
+    <DialogContext.Provider value={{ open, onOpenChange }}>
+      {open ? children : null}
+    </DialogContext.Provider>
+  )
+}
+
+// pemicu (seperti tombol) untuk menampilkan modal popup
+function DialogTrigger({ asChild, children, ...props }) {
+  const context = React.useContext(DialogContext)
+  if (!context) return null
+  const { onOpenChange } = context
+
+  const handleClick = (e) => {
+    if (children && children.props && children.props.onClick) {
+      children.props.onClick(e)
+    }
+    onOpenChange(true)
+  }
+
+  if (asChild && children) {
+    return React.cloneElement(children, {
+      onClick: handleClick,
+      ...props
+    })
+  }
+
+  return (
+    <button type="button" onClick={() => onOpenChange(true)} {...props}>
+      {children}
+    </button>
+  )
+}
+
+// pemindah render html agar melayang di tingkat teratas halaman
+function DialogPortal({ children }) {
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {children}
+    </div>,
+    document.body
+  )
+}
+
+// pemicu (seperti tombol silang) untuk menyembunyikan modal popup
+function DialogClose({ asChild, children, ...props }) {
+  const context = React.useContext(DialogContext)
+  if (!context) return null
+  const { onOpenChange } = context
+
+  const handleClick = (e) => {
+    if (children && children.props && children.props.onClick) {
+      children.props.onClick(e)
+    }
+    onOpenChange(false)
+  }
+
+  if (asChild && children) {
+    return React.cloneElement(children, {
+      onClick: handleClick,
+      ...props
+    })
+  }
+
+  return (
+    <button type="button" onClick={() => onOpenChange(false)} {...props}>
+      {children || "Close"}
+    </button>
+  )
+}
+
+// efek bayangan gelap transparan di luar area kotak modal
+function DialogOverlay({ className, ...props }) {
+  const context = React.useContext(DialogContext)
+  if (!context) return null
+  const { onOpenChange } = context
+
+  return (
+    <div
+      onClick={() => onOpenChange(false)}
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in",
         className
       )}
-      {...props} />
-  );
+      {...props}
+    />
+  )
 }
 
-function DialogContent({
-  className,
-  children,
-  showCloseButton = true,
-  ...props
-}) {
+// wadah utama penampung isi dialog modal (kotak pop-up putih di tengah layar)
+function DialogContent({ className, children, showCloseButton = true, ...props }) {
+  const context = React.useContext(DialogContext)
+  if (!context) return null
+  const { onOpenChange } = context
+
   return (
     <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Popup
-        data-slot="dialog-content"
+      <div
+        role="dialog"
+        aria-modal="true"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "relative z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 shadow-lg outline-none sm:max-w-sm transition-all duration-300 animate-in fade-in zoom-in-95",
           className
         )}
-        {...props}>
+        {...props}
+      >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={
-              <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />
-            }>
-            <XIcon />
+          <Button
+            variant="ghost"
+            className="absolute top-2 right-2 h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            size="icon-sm"
+            onClick={() => onOpenChange(false)}
+          >
+            <XIcon className="h-4 w-4" />
             <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
+          </Button>
         )}
-      </DialogPrimitive.Popup>
+      </div>
     </DialogPortal>
-  );
+  )
 }
 
-function DialogHeader({
-  className,
-  ...props
-}) {
+// bagian atas modal untuk menempatkan judul
+function DialogHeader({ className, ...props }) {
   return (
     <div
-      data-slot="dialog-header"
       className={cn("flex flex-col gap-2", className)}
-      {...props} />
-  );
+      {...props}
+    />
+  )
 }
 
-function DialogFooter({
-  className,
-  showCloseButton = false,
-  children,
-  ...props
-}) {
+// bagian bawah modal untuk menempatkan tombol konfirmasi atau batal
+function DialogFooter({ className, showCloseButton = false, children, ...props }) {
+  const context = React.useContext(DialogContext)
+  if (!context) return null
+  const { onOpenChange } = context
+
   return (
     <div
-      data-slot="dialog-footer"
       className={cn(
         "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
         className
       )}
-      {...props}>
+      {...props}
+    >
       {children}
       {showCloseButton && (
-        <DialogPrimitive.Close render={<Button variant="outline" />}>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>
           Close
-        </DialogPrimitive.Close>
+        </Button>
       )}
     </div>
-  );
+  )
 }
 
-function DialogTitle({
-  className,
-  ...props
-}) {
+// teks judul utama pop-up
+function DialogTitle({ className, ...props }) {
   return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
+    <h2
       className={cn("font-heading text-base leading-none font-medium", className)}
-      {...props} />
-  );
+      {...props}
+    />
+  )
 }
 
-function DialogDescription({
-  className,
-  ...props
-}) {
+// teks penjelasan tambahan di bawah judul
+function DialogDescription({ className, ...props }) {
   return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
+    <p
       className={cn(
         "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
         className
       )}
-      {...props} />
-  );
+      {...props}
+    />
+  )
 }
 
 export {

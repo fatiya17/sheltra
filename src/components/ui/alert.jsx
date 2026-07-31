@@ -1,6 +1,5 @@
 import * as React from "react"
-import { cva } from "class-variance-authority";
-
+import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const alertVariants = cva(
@@ -19,6 +18,7 @@ const alertVariants = cva(
   }
 )
 
+// kotak notifikasi pengumuman/peringatan penting
 function Alert({
   className,
   variant,
@@ -33,6 +33,7 @@ function Alert({
   );
 }
 
+// judul teks pengumuman penting
 function AlertTitle({
   className,
   ...props
@@ -48,6 +49,7 @@ function AlertTitle({
   );
 }
 
+// isi paragraf penjelasan pengumuman penting
 function AlertDescription({
   className,
   ...props
@@ -63,6 +65,7 @@ function AlertDescription({
   );
 }
 
+// tombol aksi penutup di dalam kotak notifikasi
 function AlertAction({
   className,
   ...props
