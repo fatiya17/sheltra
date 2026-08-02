@@ -4,7 +4,7 @@ import * as React from "react"
 import { Lightbox as AstryxLightbox } from "@astryxdesign/core/Lightbox"
 export { useLightbox } from "@astryxdesign/core/Lightbox"
 
-// penampil foto/video layar penuh dengan mode geser (galeri zoom)
+// modal lightbox zoom media
 function Lightbox({
   open,
   close,
