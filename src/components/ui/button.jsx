@@ -12,6 +12,7 @@ const variantClasses = {
   destructive:
     "bg-destructive/10 text-destructive focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
   link: "text-primary underline-offset-4 hover:underline",
+  pill: "bg-[var(--color-primary)] text-black font-semibold rounded-full hover:brightness-95",
 }
 
 const sizeClasses = {
@@ -24,8 +25,9 @@ const sizeClasses = {
   "icon-xs":
     "size-8 p-0 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3.5",
   "icon-sm":
-    "size-9.5 p-0 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-4.5",
+    "size-9.5 p-0 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-4.5'])]",
   "icon-lg": "size-14 p-0 [&_svg:not([class*='size-'])]:size-6.5",
+  pill: "px-5 py-2.5 gap-2 rounded-full",
 }
 
 const fontSizeClasses = {
