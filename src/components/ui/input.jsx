@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-// kolom ketik teks satu baris biasa (seperti input nama, email, atau alamat)
+// input text field
 const Input = React.forwardRef(({
   className,
   type,
@@ -15,7 +15,7 @@ const Input = React.forwardRef(({
       data-slot="input"
       spellCheck={spellCheck}
       className={cn(
-        "flex w-full min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent px-4 py-3 text-xs md:text-sm text-slate-800 dark:text-slate-200 transition-colors outline-none placeholder:text-slate-450 placeholder:font-light focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-50/50 dark:disabled:bg-slate-900/50 disabled:opacity-50 aria-invalid:border-[1.5px] aria-invalid:border-destructive aria-invalid:focus-visible:border-slate-350 dark:aria-invalid:focus-visible:border-slate-700 aria-invalid:focus-visible:ring-0",
+        "flex w-full min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent px-4 py-3 text-sm text-slate-800 dark:text-slate-200 transition-colors outline-none placeholder:text-slate-450 placeholder:font-light focus:outline-none focus:border-black focus:ring-1 focus:ring-black dark:focus:border-white dark:focus:ring-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-50/50 dark:disabled:bg-slate-900/50 disabled:opacity-50 aria-invalid:border-red-500 aria-invalid:focus:border-black aria-invalid:focus:ring-black dark:aria-invalid:focus:border-white dark:aria-invalid:focus:ring-white",
         className
       )}
       {...props} />
