@@ -1,9 +1,15 @@
-import AnonymousReport from "@/features/report/components/anonymous-report";
+"use client"
+
+import React from "react"
+import AnonymousReport from "@/features/report/components/anonymous-report"
 
 export default function Home() {
   return (
-    <main className="min-h-screen w-full bg-background md:py-10 flex flex-col items-center justify-start gap-8">
-      <AnonymousReport />
+    <main className="min-h-screen w-full bg-background flex flex-col items-center justify-start">
+      {/* konten fitur laporan anonim */}
+      <div className="w-full flex-1 flex flex-col">
+        <AnonymousReport />
+      </div>
     </main>
-  );
+  )
 }
