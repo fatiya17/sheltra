@@ -2,6 +2,14 @@
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+  async rewrites() {
+    return [
+      {
+        source: "/safet-route",
+        destination: "/safe-route",
+      },
+    ]
+  },
 };
 
 export default nextConfig;
