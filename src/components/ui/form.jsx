@@ -5,12 +5,12 @@ import { Controller, FormProvider, useFormContext } from "react-hook-form"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
-// wadah pembungkus formulir pendaftaran/pengisian data
+// wrapper form
 const Form = FormProvider
 
 const FormFieldContext = React.createContext({})
 
-// pengatur data tiap kolom input di dalam formulir
+// field controller form
 const FormField = ({
   ...props
 }) => {
@@ -23,7 +23,7 @@ const FormField = ({
 
 const FormItemContext = React.createContext({})
 
-// pembaca status data (seperti melihat apakah input sudah diisi atau error)
+// hook state form field
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
@@ -47,26 +47,26 @@ const useFormField = () => {
   }
 }
 
-// wadah pembungkus satu baris isian formulir (label + input + pesan error)
+// container item form
 const FormItem = React.forwardRef(({ className, ...props }, ref) => {
   const id = React.useId()
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div ref={ref} className={cn("grid gap-1.5", className)} {...props} />
+      <div ref={ref} className={cn("flex flex-col gap-1.5", className)} {...props} />
     </FormItemContext.Provider>
   )
 })
 FormItem.displayName = "FormItem"
 
-// label teks nama kolom input formulir
+// label form
 const FormLabel = React.forwardRef(({ className, ...props }, ref) => {
-  const { error, formItemId } = useFormField()
+  const { formItemId } = useFormField()
 
   return (
     <Label
       ref={ref}
-      className={cn(error && "text-destructive", className)}
+      className={className}
       htmlFor={formItemId}
       {...props}
     />
@@ -74,7 +74,7 @@ const FormLabel = React.forwardRef(({ className, ...props }, ref) => {
 })
 FormLabel.displayName = "FormLabel"
 
-// pengatur status validasi/invalidasi elemen input formulir
+// kontrol elemen input
 const FormControl = React.forwardRef(({ children, ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
@@ -96,7 +96,7 @@ const FormControl = React.forwardRef(({ children, ...props }, ref) => {
 })
 FormControl.displayName = "FormControl"
 
-// teks petunjuk atau instruksi cara mengisi formulir
+// deskripsi form
 const FormDescription = React.forwardRef(({ className, ...props }, ref) => {
   const { formDescriptionId } = useFormField()
 
@@ -111,7 +111,7 @@ const FormDescription = React.forwardRef(({ className, ...props }, ref) => {
 })
 FormDescription.displayName = "FormDescription"
 
-// teks pesan kesalahan merah jika input tidak sesuai aturan
+// pesan error validasi
 const FormMessage = React.forwardRef(({ className, children, ...props }, ref) => {
   const { error, formMessageId } = useFormField()
   const body = error ? String(error?.message) : children
@@ -124,7 +124,7 @@ const FormMessage = React.forwardRef(({ className, children, ...props }, ref) =>
     <p
       ref={ref}
       id={formMessageId}
-      className={cn("text-xs font-medium text-destructive", className)}
+      className={cn("text-xs text-red-500", className)}
       {...props}
     >
       {body}
