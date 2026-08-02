@@ -8,7 +8,7 @@ import { XIcon } from "lucide-react"
 
 const DialogContext = React.createContext(null)
 
-// pembungkus modal pop-up melayang layar penuh
+// wrapper modal popup
 function Dialog({ open, onOpenChange, children }) {
   React.useEffect(() => {
     if (open) {
@@ -28,7 +28,7 @@ function Dialog({ open, onOpenChange, children }) {
   )
 }
 
-// pemicu (seperti tombol) untuk menampilkan modal popup
+// trigger buka dialog
 function DialogTrigger({ asChild, children, ...props }) {
   const context = React.useContext(DialogContext)
   if (!context) return null
@@ -55,7 +55,7 @@ function DialogTrigger({ asChild, children, ...props }) {
   )
 }
 
-// pemindah render html agar melayang di tingkat teratas halaman
+// portal modal body
 function DialogPortal({ children }) {
   const [mounted, setMounted] = React.useState(false)
 
@@ -74,7 +74,7 @@ function DialogPortal({ children }) {
   )
 }
 
-// pemicu (seperti tombol silang) untuk menyembunyikan modal popup
+// trigger tutup dialog
 function DialogClose({ asChild, children, ...props }) {
   const context = React.useContext(DialogContext)
   if (!context) return null
@@ -101,7 +101,7 @@ function DialogClose({ asChild, children, ...props }) {
   )
 }
 
-// efek bayangan gelap transparan di luar area kotak modal
+// overlay backdrop dialog
 function DialogOverlay({ className, ...props }) {
   const context = React.useContext(DialogContext)
   if (!context) return null
@@ -119,7 +119,7 @@ function DialogOverlay({ className, ...props }) {
   )
 }
 
-// wadah utama penampung isi dialog modal (kotak pop-up putih di tengah layar)
+// content box dialog
 function DialogContent({ className, children, showCloseButton = true, ...props }) {
   const context = React.useContext(DialogContext)
   if (!context) return null
@@ -154,7 +154,7 @@ function DialogContent({ className, children, showCloseButton = true, ...props }
   )
 }
 
-// bagian atas modal untuk menempatkan judul
+// header area dialog
 function DialogHeader({ className, ...props }) {
   return (
     <div
@@ -164,7 +164,7 @@ function DialogHeader({ className, ...props }) {
   )
 }
 
-// bagian bawah modal untuk menempatkan tombol konfirmasi atau batal
+// footer area dialog
 function DialogFooter({ className, showCloseButton = false, children, ...props }) {
   const context = React.useContext(DialogContext)
   if (!context) return null
@@ -188,7 +188,7 @@ function DialogFooter({ className, showCloseButton = false, children, ...props }
   )
 }
 
-// teks judul utama pop-up
+// title text dialog
 function DialogTitle({ className, ...props }) {
   return (
     <h2
@@ -198,7 +198,7 @@ function DialogTitle({ className, ...props }) {
   )
 }
 
-// teks penjelasan tambahan di bawah judul
+// deskripsi subtitle dialog
 function DialogDescription({ className, ...props }) {
   return (
     <p
