@@ -62,7 +62,96 @@ export default function SafeCommute() {
   // state kontrol layer peta
   const [showSafePoints, setShowSafePoints] = useState(true)
   const [showRiskZones, setShowRiskZones] = useState(true)
-  const [isSheetExpanded, setIsSheetExpanded] = useState(false)
+  // state tinggi bottom sheet mobile ("minimized", "half", "expanded")
+  const [sheetState, setSheetState] = useState("half")
+  const [dragOffset, setDragOffset] = useState(0)
+  const isDraggingRef = useRef(false)
+  const startYRef = useRef(0)
+
+  // cek apakah ada rute tambahan (> 2) atau analisis risiko
+  const hasExtraContent = (routeData?.routes?.length || 0) > 2 || Boolean(routeData?.timeRiskAnalysis)
+
+  // touch event handler untuk mobile
+  const handleTouchStart = (e) => {
+    if (e.touches && e.touches[0]) {
+      startYRef.current = e.touches[0].clientY
+      isDraggingRef.current = true
+    }
+  }
+
+  const handleTouchMove = (e) => {
+    if (!isDraggingRef.current) return
+    if (e.touches && e.touches[0]) {
+      const currentY = e.touches[0].clientY
+      const delta = currentY - startYRef.current
+      // jika tidak ada konten > 2 rute, jangan drag ke atas
+      if (!hasExtraContent && sheetState === "half" && delta < 0) {
+        setDragOffset(0)
+      } else {
+        setDragOffset(delta)
+      }
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return
+    isDraggingRef.current = false
+    const delta = dragOffset
+    setDragOffset(0)
+
+    if (delta > 30) {
+      setSheetState("minimized")
+    } else if (delta < -30) {
+      if (sheetState === "minimized") {
+        setSheetState("half")
+      } else if (hasExtraContent) {
+        setSheetState("expanded")
+      }
+    } else if (Math.abs(delta) < 5) {
+      setSheetState((prev) => (prev === "minimized" ? "half" : "minimized"))
+    }
+  }
+
+  // mouse event handler untuk desktop/simulator
+  const handleMouseDown = (e) => {
+    if (typeof window === "undefined") return
+    startYRef.current = e.clientY
+    isDraggingRef.current = true
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isDraggingRef.current) return
+      const delta = moveEvent.clientY - startYRef.current
+      if (!hasExtraContent && sheetState === "half" && delta < 0) {
+        setDragOffset(0)
+      } else {
+        setDragOffset(delta)
+      }
+    }
+
+    const handleMouseUp = (upEvent) => {
+      isDraggingRef.current = false
+      const delta = upEvent.clientY - startYRef.current
+      setDragOffset(0)
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+
+      if (delta > 30) {
+        setSheetState("minimized")
+      } else if (delta < -30) {
+        if (sheetState === "minimized") {
+          setSheetState("half")
+        } else if (hasExtraContent) {
+          setSheetState("expanded")
+        }
+      } else if (Math.abs(delta) < 5) {
+        setSheetState((prev) => (prev === "minimized" ? "half" : "minimized"))
+      }
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+
   const [isNavigating, setIsNavigating] = useState(false)
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
 
@@ -897,146 +986,158 @@ export default function SafeCommute() {
           </div>
         </div>
 
-        {/* bottom draggable sheet */}
-        <div
-          className={`absolute bottom-0 left-0 right-0 z-30 bg-card/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl transition-all duration-300 flex flex-col pointer-events-auto ${
-            isSheetExpanded ? "max-h-[82vh]" : "max-h-[56vh]"
-          }`}
-        >
+        {/* bottom draggable sheet yang menyatu sampai ke bawah layar */}
+        <div className="absolute bottom-0 left-0 right-0 z-30 bg-card/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
           {/* drag handle bar */}
           <div
-            onClick={() => setIsSheetExpanded(!isSheetExpanded)}
-            className="w-full pt-2.5 pb-1.5 flex flex-col items-center justify-center cursor-pointer select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            className="w-full py-2.5 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none shrink-0"
+            title="Tarik ke atas atau ke bawah untuk mengatur ukuran"
           >
-            <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30 mb-1" />
-            <div className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-              <span>{isSheetExpanded ? "Tutup Rincian" : "Tampilkan Prediksi Waktu"}</span>
-              {isSheetExpanded ? (
-                <ChevronDown className="w-3 h-3" />
-              ) : (
-                <ChevronUp className="w-3 h-3" />
-              )}
-            </div>
+            <div className="w-12 h-1.5 rounded-full bg-muted-foreground/40 hover:bg-muted-foreground/60 transition-colors" />
           </div>
 
-          {/* konten bottom sheet */}
-          <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
-            {/* mode transportasi tabs */}
-            <div className="flex items-center gap-2 border-b border-border/60 pb-2">
-              {TRAVEL_MODES.map((mode) => {
-                const isSelected = travelMode === mode.id
-                return (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => handleModeChange(mode.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold transition-all ${
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {mode.id === "walking" && <Footprints className="w-3 h-3" />}
-                    {mode.id === "motorcycle" && <Bike className="w-3 h-3" />}
-                    {mode.id === "car" && <Car className="w-3 h-3" />}
-                    <span>{mode.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+          {/* konten bottom sheet yang menyusut saat di-drag atau minimized */}
+          <div
+            style={{
+              maxHeight:
+                sheetState === "minimized"
+                  ? "0px"
+                  : dragOffset > 0
+                  ? `${Math.max(0, 320 - dragOffset)}px`
+                  : sheetState === "expanded" && hasExtraContent
+                  ? "60vh"
+                  : "320px",
+              opacity:
+                sheetState === "minimized"
+                  ? 0
+                  : dragOffset > 0
+                  ? Math.max(0, 1 - dragOffset / 120)
+                  : 1,
+            }}
+            className={`overflow-y-auto px-4 space-y-3 ${
+              dragOffset > 0 ? "" : "transition-all duration-300 ease-out"
+            } ${sheetState === "minimized" ? "pointer-events-none pb-0" : "pb-2"}`}
+          >
+              {/* mode transportasi tabs */}
+              <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                {TRAVEL_MODES.map((mode) => {
+                  const isSelected = travelMode === mode.id
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => handleModeChange(mode.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold transition-all ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {mode.id === "walking" && <Footprints className="w-3 h-3" />}
+                      {mode.id === "motorcycle" && <Bike className="w-3 h-3" />}
+                      {mode.id === "car" && <Car className="w-3 h-3" />}
+                      <span>{mode.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
 
-            {/* daftar alternatif rute */}
-            <div className="space-y-2">
-              {routes.map((route) => {
-                const isSelected = selectedRouteId === route.id
-                return (
-                  <div
-                    key={route.id}
-                    onClick={() => setSelectedRouteId(route.id)}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 select-none ${
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30"
-                        : "border-input bg-card hover:bg-muted/30"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const isPink = !route.isBlankSpot && route.safetyScore >= 80;
-                          const bgClass = isPink 
-                            ? "bg-[#FCCADC] text-[#83004B] dark:bg-[#83004B]/20 dark:text-[#FCCADC]"
-                            : "bg-[#F8DA9D] text-[#584400] dark:bg-[#584400]/20 dark:text-[#F8DA9D]";
-                            
-                          return (
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-semibold shrink-0 transition-colors ${bgClass}`}>
-                              {travelMode === "walking" ? (
-                                <Footprints className="w-4 h-4" />
-                              ) : travelMode === "car" ? (
-                                <Car className="w-4 h-4" />
-                              ) : (
-                                <Bike className="w-4 h-4" />
-                              )}
-                            </div>
-                          );
-                        })()}
-                        <div>
-                          <p className="text-[13px] font-semibold text-foreground">
-                            {route.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {route.duration} • {route.distance}
-                          </p>
+              {/* daftar alternatif rute */}
+              <div className="space-y-2">
+                {routes.map((route) => {
+                  const isSelected = selectedRouteId === route.id
+                  return (
+                    <div
+                      key={route.id}
+                      onClick={() => setSelectedRouteId(route.id)}
+                      className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 select-none ${
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30"
+                          : "border-input bg-card hover:bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const isPink = !route.isBlankSpot && route.safetyScore >= 80;
+                            const bgClass = isPink 
+                              ? "bg-[#FCCADC] text-[#83004B] dark:bg-[#83004B]/20 dark:text-[#FCCADC]"
+                              : "bg-[#F8DA9D] text-[#584400] dark:bg-[#584400]/20 dark:text-[#F8DA9D]";
+                              
+                            return (
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-semibold shrink-0 transition-colors ${bgClass}`}>
+                                {travelMode === "walking" ? (
+                                  <Footprints className="w-4 h-4" />
+                                ) : travelMode === "car" ? (
+                                  <Car className="w-4 h-4" />
+                                ) : (
+                                  <Bike className="w-4 h-4" />
+                                )}
+                              </div>
+                            );
+                          })()}
+                          <div>
+                            <p className="text-[13px] font-semibold text-foreground">
+                              {route.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {route.duration} • {route.distance}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {route.isBlankSpot ? (
+                            <Badge variant="yellow">Data Terbatas</Badge>
+                          ) : route.safetyScore >= 80 ? (
+                            <Badge variant="pink">
+                              Skor {route.safetyScore}/100
+                            </Badge>
+                          ) : (
+                            <Badge variant="yellow">
+                              Skor {route.safetyScore}/100
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {route.isBlankSpot ? (
-                          <Badge variant="yellow">Data Terbatas</Badge>
-                        ) : route.safetyScore >= 80 ? (
-                          <Badge variant="pink">
-                            Skor {route.safetyScore}/100
-                          </Badge>
-                        ) : (
-                          <Badge variant="yellow">
-                            Skor {route.safetyScore}/100
-                          </Badge>
-                        )}
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Sun className="w-3 h-3 text-amber-500" />
+                          <span>Penerangan {route.lightingScore}%</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3 text-sky-500" />
+                          <span>{route.safePointsCount} Safe Points</span>
+                        </div>
                       </div>
                     </div>
+                  )
+                })}
+              </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-1 text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Sun className="w-3 h-3 text-amber-500" />
-                        <span>Penerangan {route.lightingScore}%</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3 text-sky-500" />
-                        <span>{route.safePointsCount} Safe Points</span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {/* analisis prediksi risiko berbasis waktu */}
+              {routeData?.timeRiskAnalysis && (
+                <div className="pt-2 border-t border-border/50">
+                  <RiskTimeline
+                    analysis={routeData.timeRiskAnalysis}
+                    departureTime={departureTime}
+                    onSelectHour={handleTimeChange}
+                  />
+                </div>
+              )}
             </div>
 
-            {/* analisis prediksi risiko berbasis waktu */}
-            {routeData?.timeRiskAnalysis && (
-              <div className="pt-2 border-t border-border/50">
-                <RiskTimeline
-                  analysis={routeData.timeRiskAnalysis}
-                  departureTime={departureTime}
-                  onSelectHour={handleTimeChange}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* bottom action bar */}
-          <div className="p-3 border-t border-border/60 bg-card flex items-center gap-2.5">
+          {/* bottom action bar (terpasang rapi di dasar bottom sheet) */}
+          <div className="p-3 border-t border-border/60 bg-card shrink-0 flex items-center gap-2.5 shadow-lg">
             <button
               type="button"
               onClick={handleShareTracking}
-              className="py-3 px-3 rounded-2xl border border-input bg-muted/40 hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+              className="py-3 px-3.5 rounded-2xl border border-input bg-muted/40 hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs"
             >
               <Share2 className="w-4 h-4 text-primary" />
               <span>Live Tracking</span>
