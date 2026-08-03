@@ -79,12 +79,13 @@ export function TimePicker({
             variant="outline"
             disabled={disabled}
             className={cn(
-              "w-full justify-start text-left font-normal h-9 px-3 focus:border-primary focus:ring-primary aria-invalid:focus:border-primary aria-invalid:focus:ring-primary gap-2",
+              "w-full justify-start text-left font-normal h-9 px-3 gap-2",
+              open && "bg-primary text-primary-foreground border-primary",
               !value && "text-muted-foreground",
               triggerClassName || className
             )}
           >
-            <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <Clock className="h-3.5 w-3.5 text-current opacity-70 shrink-0" />
             <span className="font-semibold text-xs">{displayTime}</span>
           </Button>
         }
