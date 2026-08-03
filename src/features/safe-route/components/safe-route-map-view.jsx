@@ -42,7 +42,94 @@ export function SafeRouteMapView({
   // state kontrol layer peta
   const [showSafePoints, setShowSafePoints] = useState(true)
   const [showRiskZones, setShowRiskZones] = useState(true)
-  const [isSheetExpanded, setIsSheetExpanded] = useState(false)
+  // state tinggi bottom sheet mobile ("minimized", "half", "expanded")
+  const [sheetState, setSheetState] = useState("half")
+  const [dragOffset, setDragOffset] = useState(0)
+  const isDraggingRef = useRef(false)
+  const startYRef = useRef(0)
+
+  const hasExtraContent = (routeData?.routes?.length || 0) > 2 || Boolean(routeData?.timeRiskAnalysis)
+
+  // touch event handler untuk mobile
+  const handleTouchStart = (e) => {
+    if (e.touches && e.touches[0]) {
+      startYRef.current = e.touches[0].clientY
+      isDraggingRef.current = true
+    }
+  }
+
+  const handleTouchMove = (e) => {
+    if (!isDraggingRef.current) return
+    if (e.touches && e.touches[0]) {
+      const currentY = e.touches[0].clientY
+      const delta = currentY - startYRef.current
+      if (!hasExtraContent && sheetState === "half" && delta < 0) {
+        setDragOffset(0)
+      } else {
+        setDragOffset(delta)
+      }
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return
+    isDraggingRef.current = false
+    const delta = dragOffset
+    setDragOffset(0)
+
+    if (delta > 30) {
+      setSheetState("minimized")
+    } else if (delta < -30) {
+      if (sheetState === "minimized") {
+        setSheetState("half")
+      } else if (hasExtraContent) {
+        setSheetState("expanded")
+      }
+    } else if (Math.abs(delta) < 5) {
+      setSheetState((prev) => (prev === "minimized" ? "half" : "minimized"))
+    }
+  }
+
+  // mouse event handler untuk desktop/simulator
+  const handleMouseDown = (e) => {
+    if (typeof window === "undefined") return
+    startYRef.current = e.clientY
+    isDraggingRef.current = true
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isDraggingRef.current) return
+      const delta = moveEvent.clientY - startYRef.current
+      if (!hasExtraContent && sheetState === "half" && delta < 0) {
+        setDragOffset(0)
+      } else {
+        setDragOffset(delta)
+      }
+    }
+
+    const handleMouseUp = (upEvent) => {
+      isDraggingRef.current = false
+      const delta = upEvent.clientY - startYRef.current
+      setDragOffset(0)
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+
+      if (delta > 30) {
+        setSheetState("minimized")
+      } else if (delta < -30) {
+        if (sheetState === "minimized") {
+          setSheetState("half")
+        } else if (hasExtraContent) {
+          setSheetState("expanded")
+        }
+      } else if (Math.abs(delta) < 5) {
+        setSheetState((prev) => (prev === "minimized" ? "half" : "minimized"))
+      }
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+
   const [isNavigating, setIsNavigating] = useState(false)
 
   const routes = routeData?.routes || []
@@ -440,156 +527,173 @@ export function SafeRouteMapView({
       </div>
 
       {/* BOTTOM SHEET / SIDE PANEL (RESPONSIF) */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 md:left-6 md:bottom-6 md:right-auto md:w-[420px] z-30 bg-card/98 backdrop-blur-xl border-t md:border border-input md:rounded-3xl rounded-t-[28px] shadow-2xl transition-all duration-300 flex flex-col pointer-events-auto ${
-          isSheetExpanded ? "max-h-[82vh] md:max-h-[75vh]" : "max-h-[52vh] md:max-h-[58vh]"
-        }`}
-      >
-        {/* drag handle bar */}
+      <div className="absolute bottom-0 md:bottom-6 left-0 right-0 md:left-6 md:right-auto md:w-[420px] z-30 bg-card/98 backdrop-blur-xl border-t md:border border-input md:rounded-3xl rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
+        {/* drag handle bar (hanya tampil di mobile) */}
         <div
-          onClick={() => setIsSheetExpanded(!isSheetExpanded)}
-          className="w-full pt-2.5 pb-1.5 flex flex-col items-center justify-center cursor-pointer select-none"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          className="w-full py-2.5 flex md:hidden flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none shrink-0"
+          title="Tarik ke atas atau ke bawah untuk mengatur ukuran"
         >
-          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30 mb-1" />
-          <div className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-            <span>{isSheetExpanded ? "Tutup Rincian" : "Tampilkan Prediksi Waktu"}</span>
-            {isSheetExpanded ? (
-              <ChevronDown className="w-3 h-3" />
-            ) : (
-              <ChevronUp className="w-3 h-3" />
-            )}
-          </div>
+          <div className="w-12 h-1.5 rounded-full bg-muted-foreground/40 hover:bg-muted-foreground/60 transition-colors" />
         </div>
 
-        {/* konten scrollable sheet */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3.5">
-          {/* mode transportasi tabs */}
-          <div className="flex items-center gap-2 border-b border-border/60 pb-2">
-            {TRAVEL_MODES.map((mode) => {
-              const isSelected = (routeData?.travelMode || "walking") === mode.id
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => onModeChange && onModeChange(mode.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                    isSelected
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
-                  {mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}
-                  {mode.id === "car" && <Car className="w-3.5 h-3.5" />}
-                  <span>{mode.label}</span>
-                </button>
-              )
-            })}
-          </div>
+        {/* konten scrollable sheet yang menyusut saat di-drag atau minimized */}
+        <div
+          style={{
+            maxHeight:
+              sheetState === "minimized"
+                ? "0px"
+                : dragOffset > 0
+                ? `${Math.max(0, 320 - dragOffset)}px`
+                : sheetState === "expanded" && hasExtraContent
+                ? "60vh"
+                : "320px",
+            opacity:
+              sheetState === "minimized"
+                ? 0
+                : dragOffset > 0
+                ? Math.max(0, 1 - dragOffset / 120)
+                : 1,
+          }}
+          className={`overflow-y-auto px-4 space-y-3.5 ${
+            dragOffset > 0 ? "" : "transition-all duration-300 ease-out"
+          } ${sheetState === "minimized" ? "pointer-events-none pb-0" : "pb-2"}`}
+        >
+            {/* mode transportasi tabs */}
+            <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+              {TRAVEL_MODES.map((mode) => {
+                const isSelected = (routeData?.travelMode || "walking") === mode.id
+                return (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => onModeChange && onModeChange(mode.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
+                    {mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}
+                    {mode.id === "car" && <Car className="w-3.5 h-3.5" />}
+                    <span>{mode.label}</span>
+                  </button>
+                )
+              })}
+            </div>
 
-          {/* daftar alternatif rute */}
-          <div className="space-y-2.5">
-            {routes.map((route) => {
-              const isSelected = selectedRouteId === route.id
-              return (
-                <div
-                  key={route.id}
-                  onClick={() => onSelectRoute(route.id)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 relative select-none ${
-                    isSelected
-                      ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-                      : "border-input bg-card hover:bg-muted/30"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-2xl bg-primary/15 text-foreground flex items-center justify-center font-semibold shrink-0">
-                        {routeData?.travelMode === "walking" ? (
-                          <Footprints className="w-5 h-5 text-primary" />
-                        ) : routeData?.travelMode === "car" ? (
-                          <Car className="w-5 h-5 text-primary" />
-                        ) : (
-                          <Bike className="w-5 h-5 text-primary" />
-                        )}
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-semibold text-foreground">
-                            {route.title}
+            {/* daftar alternatif rute */}
+            <div className="space-y-2.5">
+              {routes.map((route) => {
+                const isSelected = selectedRouteId === route.id
+                return (
+                  <div
+                    key={route.id}
+                    onClick={() => onSelectRoute(route.id)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 relative select-none ${
+                      isSelected
+                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                        : "border-input bg-card hover:bg-muted/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-2xl bg-primary/15 text-foreground flex items-center justify-center font-semibold shrink-0">
+                          {routeData?.travelMode === "walking" ? (
+                            <Footprints className="w-5 h-5 text-primary" />
+                          ) : routeData?.travelMode === "car" ? (
+                            <Car className="w-5 h-5 text-primary" />
+                          ) : (
+                            <Bike className="w-5 h-5 text-primary" />
+                          )}
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-foreground">
+                              {route.title}
+                            </p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {route.duration} • {route.distance}
                           </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {route.duration} • {route.distance}
-                        </p>
+                      </div>
+
+                      {/* skor keamanan & radio selector */}
+                      <div className="flex items-center gap-2">
+                        {route.isBlankSpot ? (
+                          <Badge variant="yellow">Data Terbatas</Badge>
+                        ) : route.safetyScore >= 80 ? (
+                          <Badge variant="pink">
+                            Skor {route.safetyScore} ({route.riskLevel})
+                          </Badge>
+                        ) : (
+                          <Badge variant="orange">
+                            Skor {route.safetyScore} ({route.riskLevel})
+                          </Badge>
+                        )}
+
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            isSelected
+                              ? "border-primary bg-primary"
+                              : "border-muted-foreground/50"
+                          }`}
+                        >
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                        </div>
                       </div>
                     </div>
 
-                    {/* skor keamanan & radio selector */}
-                    <div className="flex items-center gap-2">
-                      {route.isBlankSpot ? (
-                        <Badge variant="yellow">Data Terbatas</Badge>
-                      ) : route.safetyScore >= 80 ? (
-                        <Badge variant="pink">
-                          Skor {route.safetyScore} ({route.riskLevel})
-                        </Badge>
-                      ) : (
-                        <Badge variant="orange">
-                          Skor {route.safetyScore} ({route.riskLevel})
-                        </Badge>
-                      )}
-
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          isSelected
-                            ? "border-primary bg-primary"
-                            : "border-muted-foreground/50"
-                        }`}
-                      >
-                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                    {/* rincian pencahayaan & safe points */}
+                    {!route.isBlankSpot && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
+                        <span className="flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                          <strong>{route.safePointsCount} Safe Points 24 Jam</strong>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Sun className="w-3.5 h-3.5 text-amber-500" />
+                          Pencahayaan: <strong>{route.lightingScore}%</strong>
+                        </span>
                       </div>
-                    </div>
+                    )}
+
+                    {/* disclaimer jika blank spot */}
+                    {route.isBlankSpot && route.disclaimer && (
+                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-tight">
+                        {route.disclaimer}
+                      </div>
+                    )}
                   </div>
+                )
+              })}
+            </div>
 
-                  {/* rincian pencahayaan & safe points */}
-                  {!route.isBlankSpot && (
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
-                      <span className="flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                        <strong>{route.safePointsCount} Safe Points 24 Jam</strong>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Sun className="w-3.5 h-3.5 text-amber-500" />
-                        Pencahayaan: <strong>{route.lightingScore}%</strong>
-                      </span>
-                    </div>
-                  )}
-
-                  {/* disclaimer jika blank spot */}
-                  {route.isBlankSpot && route.disclaimer && (
-                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-tight">
-                      {route.disclaimer}
-                    </div>
-                  )}
+            {/* section prediksi risiko per jam jika expanded */}
+            {sheetState === "expanded" && routeData && (
+              <div className="pt-2 pb-1 border-t border-border/60 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <h3 className="text-[13px] font-bold text-foreground mb-3 flex items-center gap-1.5">
+                  <Navigation className="w-4 h-4 text-primary" />
+                  Rincian Perjalanan
+                </h3>
+                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-[9px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-muted-foreground/20 before:to-transparent">
+                  <RiskTimeline
+                    timeAnalysis={routeData.timeRiskAnalysis}
+                    selectedTime={routeData.departureTime}
+                    onSelectTime={onTimeChange}
+                  />
                 </div>
-              )
-            })}
+              </div>
+            )}
           </div>
 
-          {/* section prediksi risiko per jam jika expanded */}
-          {isSheetExpanded && routeData && (
-            <div className="pt-2 animate-in fade-in duration-200">
-              <RiskTimeline
-                timeAnalysis={routeData.timeRiskAnalysis}
-                selectedTime={routeData.departureTime}
-                onSelectTime={onTimeChange}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* BOTTOM ACTION BAR */}
-        <div className="p-4 border-t border-border/60 bg-card flex items-center gap-3">
-          {/* tombol share live tracking */}
+        {/* BOTTOM ACTION BAR (MENYATU RAPI DI DASAR SHEET) */}
+        <div className="p-3 md:p-4 border-t border-border/60 bg-card shrink-0 flex items-center gap-2.5 md:gap-3 shadow-lg">
           <button
             type="button"
             onClick={handleShareTracking}
@@ -597,14 +701,13 @@ export function SafeRouteMapView({
             title="Bagikan Live Tracking"
           >
             <Share2 className="w-4 h-4 text-primary" />
-            <span className="hidden sm:inline">Live Tracking</span>
+            <span>Live Tracking</span>
           </button>
 
-          {/* tombol utama mulai navigasi */}
           <button
             type="button"
             onClick={handleStartNavigation}
-            className="flex-1 py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all select-none"
+            className="flex-1 py-3 md:py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all select-none"
           >
             {isNavigating ? (
               <>
