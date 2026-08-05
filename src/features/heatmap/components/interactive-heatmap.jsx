@@ -381,7 +381,7 @@ export function InteractiveHeatmap() {
       {/* ========================================================================= */}
       {/* TAMPILAN 1: DESKTOP FLOATING SIDEBAR (SEBELAH KIRI LEBAR & RESPONSIF)     */}
       {/* ========================================================================= */}
-      <aside className="hidden md:flex flex-col absolute top-4 bottom-4 left-4 z-30 w-[420px] lg:w-[450px] max-w-[calc(100vw-32px)] bg-card/95 backdrop-blur-xl border border-input rounded-3xl shadow-2xl overflow-hidden pointer-events-auto">
+      <aside className="hidden md:flex flex-col absolute top-4 bottom-4 left-4 z-30 w-[420px] lg:w-[450px] max-w-[calc(100vw-32px)] bg-white/95 backdrop-blur-xl border border-input rounded-3xl shadow-2xl overflow-hidden pointer-events-auto">
         {/* header desktop sidebar */}
         <div className="p-4 border-b border-border/60 space-y-3">
           <div className="flex items-center justify-between">
@@ -405,7 +405,7 @@ export function InteractiveHeatmap() {
           </p>
 
           {/* input pencarian lokasi gaya safe-route */}
-          <div className="bg-card border border-input rounded-2xl p-3 shadow-xs">
+          <div className="bg-white border border-input rounded-2xl p-3 shadow-xs">
             <PlaceSearchInput
               value={searchQuery}
               onChange={(val) => setSearchQuery(val)}
@@ -426,7 +426,7 @@ export function InteractiveHeatmap() {
 
           {/* filter waktu dan hari desktop */}
           <div className="flex items-center gap-2 pt-1 overflow-x-auto scrollbar-none flex-nowrap pb-1">
-            <div className="flex items-center shrink-0 bg-card p-1 rounded-full border border-input shadow-xs">
+            <div className="flex items-center shrink-0 bg-white p-1 rounded-full border border-input shadow-xs">
               {TIME_RANGE_OPTIONS.map((opt) => {
                 const isSelected = selectedTimeRange === opt.id
                 return (
@@ -452,7 +452,7 @@ export function InteractiveHeatmap() {
                 onChange={setSelectedTime}
                 showSuffix={false}
                 placeholder="Semua Waktu"
-                triggerClassName="h-[30px] px-3 rounded-full border border-input bg-card text-xs font-semibold text-foreground shadow-xs gap-1.5 hover:bg-muted/30 w-auto"
+                triggerClassName="h-[30px] px-3 rounded-full border border-input bg-white text-xs font-semibold text-foreground shadow-xs gap-1.5 hover:bg-muted/30 w-auto"
               />
             </div>
           </div>
@@ -493,7 +493,7 @@ export function InteractiveHeatmap() {
                     className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 select-none ${
                       isSelected
                         ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30"
-                        : "border-input bg-card hover:bg-muted/40"
+                        : "border-input bg-white hover:bg-muted/40"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -535,7 +535,7 @@ export function InteractiveHeatmap() {
         </div>
 
         {/* tombol aksi bottom desktop */}
-        <div className="p-3 border-t border-border/60 bg-card flex items-center gap-2">
+        <div className="p-3 border-t border-border/60 bg-white flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -567,7 +567,7 @@ export function InteractiveHeatmap() {
       <div className="md:hidden w-full h-full flex flex-col p-3 z-30 pointer-events-none relative">
         <div className="w-full max-w-lg mx-auto flex flex-col space-y-3 pointer-events-auto">
           {/* search bar lokasi mobile */}
-          <div className="bg-card/95 backdrop-blur-md border border-input rounded-2xl p-2.5 shadow-xs w-full">
+          <div className="bg-white/95 backdrop-blur-md border border-input rounded-2xl p-2.5 shadow-xs w-full">
             <PlaceSearchInput
               value={searchQuery}
               onChange={(val) => setSearchQuery(val)}
@@ -590,7 +590,7 @@ export function InteractiveHeatmap() {
           <div className="flex items-center justify-between px-1 py-0.5 w-full">
             <div className="shrink-0">
               <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
-                <SelectTrigger className="h-[30px] px-3 rounded-full border border-input bg-card text-xs font-semibold text-foreground shadow-xs gap-1.5 hover:bg-primary hover:text-primary-foreground hover:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground data-[state=open]:border-primary !focus:ring-0 !focus:border-transparent focus:outline-none w-auto">
+                <SelectTrigger className="h-[30px] px-3 rounded-full border border-input bg-white text-xs font-semibold text-foreground shadow-xs gap-1.5 hover:bg-primary hover:text-primary-foreground hover:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground data-[state=open]:border-primary !focus:ring-0 !focus:border-transparent focus:outline-none w-auto">
                   <Filter className="w-3.5 h-3.5 opacity-80" />
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
@@ -610,7 +610,7 @@ export function InteractiveHeatmap() {
                 onChange={setSelectedTime}
                 showSuffix={false}
                 placeholder="Semua Waktu"
-                triggerClassName="h-[30px] px-3 rounded-full border border-input bg-card text-xs font-semibold text-foreground shadow-xs gap-1.5 hover:bg-primary hover:text-primary-foreground hover:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground data-[state=open]:border-primary !focus:ring-0 !focus:border-transparent focus:outline-none w-auto [&>svg]:opacity-80"
+                triggerClassName="h-[30px] px-3 rounded-full border border-input bg-white text-xs font-semibold text-foreground shadow-xs gap-1.5 hover:bg-primary hover:text-primary-foreground hover:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground data-[state=open]:border-primary !focus:ring-0 !focus:border-transparent focus:outline-none w-auto [&>svg]:opacity-80"
               />
             </div>
           </div>
@@ -645,7 +645,7 @@ export function InteractiveHeatmap() {
         <button
           type="button"
           onClick={handleLocateMe}
-          className="w-10 h-10 rounded-2xl bg-card/95 backdrop-blur-md border border-input shadow-md flex items-center justify-center text-foreground hover:text-primary transition-all active:scale-95"
+          className="w-10 h-10 rounded-2xl bg-white/95 backdrop-blur-md border border-input shadow-md flex items-center justify-center text-foreground hover:text-primary transition-all active:scale-95"
           title="Lokasi Saya"
         >
           <LocateFixed className="w-4 h-4" />
@@ -653,7 +653,7 @@ export function InteractiveHeatmap() {
         <button
           type="button"
           onClick={handleZoomIn}
-          className="w-10 h-10 rounded-2xl bg-card/95 backdrop-blur-md border border-input shadow-md flex items-center justify-center text-foreground hover:text-primary transition-all active:scale-95"
+          className="w-10 h-10 rounded-2xl bg-white/95 backdrop-blur-md border border-input shadow-md flex items-center justify-center text-foreground hover:text-primary transition-all active:scale-95"
           title="Perbesar Peta"
         >
           <ZoomIn className="w-4 h-4" />
@@ -661,7 +661,7 @@ export function InteractiveHeatmap() {
         <button
           type="button"
           onClick={handleZoomOut}
-          className="w-10 h-10 rounded-2xl bg-card/95 backdrop-blur-md border border-input shadow-md flex items-center justify-center text-foreground hover:text-primary transition-all active:scale-95"
+          className="w-10 h-10 rounded-2xl bg-white/95 backdrop-blur-md border border-input shadow-md flex items-center justify-center text-foreground hover:text-primary transition-all active:scale-95"
           title="Perkecil Peta"
         >
           <ZoomOut className="w-4 h-4" />
@@ -672,7 +672,7 @@ export function InteractiveHeatmap() {
       {/* DIALOG DETAIL INSIDEN SAAT HOTSPOT / TITIK DIKLIK                         */}
       {/* ========================================================================= */}
       <Dialog open={!!selectedIncident} onOpenChange={(open) => !open && setSelectedIncident(null)}>
-        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-md bg-white dark:bg-card p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-border shadow-2xl">
+        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-md bg-white dark:bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-border shadow-2xl">
           {selectedIncident && (
             <div className="space-y-4">
               <div className="space-y-1">
@@ -739,7 +739,7 @@ export function InteractiveHeatmap() {
       {/* DIALOG MODAL LAPORKAN INSIDEN ANONIM                                      */}
       {/* ========================================================================= */}
       <Dialog open={isReportModalOpen} onOpenChange={setIsReportModalOpen}>
-        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-lg bg-card p-5 sm:p-6 rounded-3xl border border-input shadow-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-lg bg-white p-5 sm:p-6 rounded-3xl border border-input shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogTitle className="text-base sm:text-lg font-bold font-heading">
             Laporkan Insiden Baru
           </DialogTitle>
