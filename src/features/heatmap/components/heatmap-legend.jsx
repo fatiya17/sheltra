@@ -15,7 +15,7 @@ export function HeatmapLegend({ className = "" }) {
 
   return (
     <div
-      className={`p-3.5 rounded-2xl border border-input bg-card/95 text-card-foreground backdrop-blur-md shadow-xs ${className}`}
+      className={`p-3.5 rounded-2xl border border-input bg-white/95 text-card-foreground backdrop-blur-md shadow-xs ${className}`}
     >
       {/* header judul legenda tanpa icon */}
       <div className="flex items-center justify-between mb-2.5">
