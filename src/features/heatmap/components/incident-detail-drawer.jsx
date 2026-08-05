@@ -25,7 +25,7 @@ export function IncidentDetailDrawer({ incident, isOpen, onClose, onOpenReport }
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       {/* card dialog detail insiden */}
       <div
-        className="w-full sm:max-w-lg bg-card sm:rounded-3xl rounded-t-3xl border border-input shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-4 duration-200"
+        className="w-full sm:max-w-lg bg-white sm:rounded-3xl rounded-t-3xl border border-input shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* header modal */}
@@ -99,7 +99,7 @@ export function IncidentDetailDrawer({ incident, isOpen, onClose, onOpenReport }
           {/* deskripsi kronologi */}
           <div className="space-y-1.5">
             <h4 className="text-xs font-semibold text-foreground">Rincian Laporan:</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed bg-card p-3 rounded-xl border border-input/60">
+            <p className="text-xs text-muted-foreground leading-relaxed bg-white p-3 rounded-xl border border-input/60">
               {incident.description}
             </p>
           </div>
