@@ -1149,7 +1149,7 @@ export default function SafeCommute() {
             {isNavigating ? <><Square className="w-4 h-4 text-black" /><span>Matikan Navigasi</span></> : <><Navigation className="w-4 h-4 text-black" /><span>Mulai Navigasi</span></>}
           </Button>
           <Button type="button" variant="primary" onClick={handleGoToProtectedTrip} className="flex-1 w-full" title="Protected Trip">
-            <Share2 className="w-4 h-4" /><span>Aktifkan Protected Trip</span>
+            <span>Protected Trip</span>
           </Button>
         </div>
       </aside>
@@ -1257,7 +1257,7 @@ export default function SafeCommute() {
               {isNavigating ? <><Square className="w-4 h-4 text-primary" /><span>Matikan</span></> : <><Navigation className="w-4 h-4 text-primary" /><span>Mulai Navigasi</span></>}
             </button>
             <button type="button" onClick={handleGoToProtectedTrip} className="flex-1 py-3 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all select-none">
-              <Share2 className="w-4 h-4" /><span>Aktifkan Protected Trip</span>
+            <span>Protected Trip</span>
             </button>
           </div>
         </div>
