@@ -266,7 +266,7 @@ export const MOCK_ROUTES = {
         "Kepadatan pejalan kaki ramai & banyak CCTV aktif",
         "Menghindari 2 zona rawan insiden di gang samping",
       ],
-      color: "#ffa2cf", // warna tema primary
+      color: "#F02E65", // warna primary
       // rute jalan protokol sudirman & scbd
       coordinates: [
         [106.8236, -6.2023],
@@ -334,7 +334,7 @@ export const MOCK_ROUTES = {
         "Penerangan optimal sepanjang trotoar",
         "Melewati 3 titik aman minimarket & pos polisi",
       ],
-      color: "#ffa2cf",
+      color: "#F02E65",
       coordinates: [
         [106.7972, -6.2442],
         [106.7945, -6.2441],
