@@ -1,5 +1,78 @@
 import { MOCK_HEATMAP_INCIDENTS, TIME_RANGE_OPTIONS, RISK_LEVELS } from "../constants/heatmap.constants"
 
+// nilai default turunan berdasarkan tingkat risiko
+const RISK_SCORE_BY_LEVEL = {
+  high: 85,
+  medium: 62,
+  low: 38,
+  safe: 12,
+  blue_point: 45,
+  purple_point: 50,
+}
+
+const REPORT_COUNT_BY_LEVEL = {
+  high: 12,
+  medium: 7,
+  low: 3,
+  safe: 0,
+  blue_point: 2,
+  purple_point: 4,
+}
+
+const pad2 = (n) => String(n).padStart(2, "0")
+
+// turunkan rentang jam rawan dari waktu kejadian
+function derivePeakHours(timeOfDay, riskLevel) {
+  if (riskLevel === "safe") return "24 Jam"
+  const match = /(\d{1,2}):\d{2}/.exec(timeOfDay || "")
+  if (!match) return "19.00 - 03.00 WIB"
+  const h = parseInt(match[1], 10)
+  const start = (h - 2 + 24) % 24
+  const end = (h + 3) % 24
+  return `${pad2(start)}.00 - ${pad2(end)}.00 WIB`
+}
+
+// jarak haversine (km) antara dua [lon, lat]
+function haversine(a, b) {
+  const R = 6371
+  const dLat = ((b[1] - a[1]) * Math.PI) / 180
+  const dLon = ((b[0] - a[0]) * Math.PI) / 180
+  const lat1 = (a[1] * Math.PI) / 180
+  const lat2 = (b[1] * Math.PI) / 180
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+}
+
+// perkaya data insiden dengan field yang dibutuhkan popup detail
+export function enrichHeatmapIncident(item, allIncidents = []) {
+  if (!item) return item
+  const level = item.riskLevel?.toLowerCase()
+  const riskScore = item.riskScore ?? RISK_SCORE_BY_LEVEL[level] ?? 50
+  const incidentCount = item.incidentCount ?? REPORT_COUNT_BY_LEVEL[level] ?? 1
+  const peakHours = item.peakHours ?? derivePeakHours(item.timeOfDay, level)
+
+  let nearestSafePoint = item.nearestSafePoint
+  if (!nearestSafePoint && Array.isArray(item.coordinates)) {
+    const safe = allIncidents.filter((i) => i.riskLevel === "safe" && i.id !== item.id)
+    if (safe.length) {
+      let best = null
+      let bestDist = Infinity
+      for (const s of safe) {
+        if (!Array.isArray(s.coordinates)) continue
+        const d = haversine(item.coordinates, s.coordinates)
+        if (d < bestDist) {
+          bestDist = d
+          best = s
+        }
+      }
+      if (best) nearestSafePoint = `${best.title} · ${best.location}`
+    }
+  }
+  if (!nearestSafePoint) nearestSafePoint = "Pos Polisi Terdekat"
+
+  return { ...item, riskScore, incidentCount, peakHours, nearestSafePoint }
+}
+
 // service pengolahan data heatmap
 class HeatmapService {
   constructor() {
