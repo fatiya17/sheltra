@@ -172,7 +172,7 @@ export function RouteSearchForm({
                       title={mode.label}
                       className={`flex items-center justify-center p-1.5 rounded-md transition-all ${
                         isSelected
-                          ? "bg-card text-foreground shadow-xs font-medium"
+                          ? "bg-white text-foreground shadow-xs font-medium"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
