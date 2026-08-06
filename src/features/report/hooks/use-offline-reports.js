@@ -67,8 +67,6 @@ export function useOfflineReports(onReportSynced) {
 
     const handleOnline = () => {
       setIsOnline(true)
-      // auto sync saat reconnect
-      syncPendingReports()
     }
 
     const handleOffline = () => {
@@ -77,11 +75,6 @@ export function useOfflineReports(onReportSynced) {
 
     window.addEventListener("online", handleOnline)
     window.addEventListener("offline", handleOffline)
-
-    // trigger sync jika online
-    if (navigator.onLine) {
-      syncPendingReports()
-    }
 
     return () => {
       window.removeEventListener("online", handleOnline)
