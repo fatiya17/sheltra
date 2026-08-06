@@ -34,8 +34,13 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ReportForm } from "@/features/report/components/report-form"
+import { enrichHeatmapIncident } from "../services/heatmap.service"
 import { useRouter } from "next/navigation"
 import "mapbox-gl/dist/mapbox-gl.css"
+
+// IMPORT KOMPONEN DRAWER YANG BARU KITA BUAT
+// (Sesuaikan path-nya jika file ini beda folder, misal: import { IncidentDetailDrawer } from "./IncidentDetailDrawer")
+import { IncidentDetailDrawer } from "./incident-detail-drawer" 
 
 export function InteractiveHeatmap() {
   const mapContainerRef = useRef(null)
@@ -179,9 +184,7 @@ export function InteractiveHeatmap() {
           el.style.height = "16px"
           el.innerHTML = `
             <div class="relative flex items-center justify-center w-full h-full">
-              <!-- wadah untuk buletan dan tooltip dengan pointer-events-auto -->
               <div class="inner-circle group relative z-50 pointer-events-auto flex items-center justify-center cursor-pointer">
-                <!-- tooltip dekat buletan warna pin -->
                 <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[9999] whitespace-nowrap">
                   <div 
                     class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-lg border border-white/20 text-xs font-medium leading-tight"
@@ -191,7 +194,6 @@ export function InteractiveHeatmap() {
                     <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[170px] truncate text-center drop-shadow-xs">
                       ${item.category}
                     </span>
-                    <!-- panah kecil tooltip -->
                     <div 
                       class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
                       style="background-color: ${dotColor};"
@@ -199,7 +201,6 @@ export function InteractiveHeatmap() {
                   </div>
                 </div>
 
-                <!-- titik dot biasa -->
                 <div 
                   class="w-3.5 h-3.5 rounded-full shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
                     isSelected ? "ring-2 ring-primary ring-offset-2" : ""
@@ -221,9 +222,6 @@ export function InteractiveHeatmap() {
 
           el.innerHTML = `
             <div class="relative flex items-center justify-center w-full h-full pointer-events-none">
-              <!-- tooltip dipindahkan ke inner-circle -->
-
-              <!-- lingkaran glow blur -->
               <div 
                 class="absolute rounded-full pointer-events-none transition-transform duration-300"
                 style="
@@ -234,9 +232,7 @@ export function InteractiveHeatmap() {
                 "
               ></div>
 
-              <!-- wadah untuk buletan dan tooltip dengan pointer-events-auto -->
               <div class="inner-circle group relative z-50 pointer-events-auto flex items-center justify-center cursor-pointer">
-                <!-- tooltip dekat buletan warna pin -->
                 <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[9999] whitespace-nowrap">
                   <div 
                     class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-xl border border-white/20 text-xs font-medium leading-tight"
@@ -246,7 +242,6 @@ export function InteractiveHeatmap() {
                     <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[180px] truncate text-center drop-shadow-xs">
                       ${item.category} • ${riskMeta?.label || 'Tinggi'}
                     </span>
-                    <!-- panah kecil tooltip -->
                     <div 
                       class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
                       style="background-color: ${solidColor};"
@@ -254,7 +249,6 @@ export function InteractiveHeatmap() {
                   </div>
                 </div>
 
-                <!-- titik solid di tengah -->
                 <div 
                   class="relative z-10 w-4 h-4 rounded-full flex items-center justify-center shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
                     isSelected ? "ring-2 ring-primary ring-offset-2" : ""
@@ -375,6 +369,11 @@ export function InteractiveHeatmap() {
       })
     }
   }
+
+  // Perkaya data incident sebelum dilempar ke drawer
+  const enrichedSelectedIncident = selectedIncident 
+    ? enrichHeatmapIncident(selectedIncident, incidents) 
+    : null;
 
   return (
     <div className="w-full h-screen bg-[#f8fafc] dark:bg-background relative flex overflow-hidden">
@@ -538,8 +537,7 @@ export function InteractiveHeatmap() {
         <div className="p-3 border-t border-border/60 bg-white flex items-center gap-2">
           <Button
             type="button"
-            variant="outline"
-            size="pill"
+            variant="secondary"
             onClick={handleLocateMe}
             className="flex-shrink-0 text-xs font-semibold"
             title="Pusatkan ke lokasi saya"
@@ -550,8 +548,7 @@ export function InteractiveHeatmap() {
 
           <Button
             type="button"
-            variant="pill"
-            size="pill"
+            variant="primary"
             onClick={() => router.push("/")}
             className="flex-1 w-full text-xs font-semibold"
           >
@@ -671,69 +668,14 @@ export function InteractiveHeatmap() {
       {/* ========================================================================= */}
       {/* DIALOG DETAIL INSIDEN SAAT HOTSPOT / TITIK DIKLIK                         */}
       {/* ========================================================================= */}
-      <Dialog open={!!selectedIncident} onOpenChange={(open) => !open && setSelectedIncident(null)}>
-        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-md bg-white dark:bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-border shadow-2xl">
-          {selectedIncident && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  {selectedIncident.riskLevel && (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{
-                        backgroundColor:
-                          RISK_LEVELS[selectedIncident.riskLevel?.toUpperCase()]?.color ||
-                          selectedIncident.color ||
-                          "#3b82f6",
-                      }}
-                    />
-                  )}
-                  <DialogTitle className="text-base font-bold font-heading text-slate-900 dark:text-foreground">
-                    {selectedIncident.title}
-                  </DialogTitle>
-                </div>
-                <DialogDescription className="text-xs text-muted-foreground">
-                  {selectedIncident.location || selectedIncident.areaName}
-                </DialogDescription>
-              </div>
-
-              {/* info detail insiden */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-muted/50 border border-slate-100 dark:border-border/60 text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="font-semibold text-xs">
-                    {selectedIncident.category}
-                  </Badge>
-                  <span className="text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {selectedIncident.timeOfDay}
-                  </span>
-                </div>
-
-                <p className="text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
-                  {selectedIncident.description}
-                </p>
-              </div>
-
-              {/* status moderasi */}
-              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                <ShieldCheck className="w-4 h-4" />
-                <span>{selectedIncident.moderationStatus}</span>
-              </div>
-
-              {/* tombol tutup dialog */}
-              <div className="pt-2 flex justify-end">
-                <Button
-                  variant="outline"
-                  className="w-full rounded-2xl text-xs font-semibold"
-                  onClick={() => setSelectedIncident(null)}
-                >
-                  Tutup
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      
+      {/* INI YANG KITA UBAH: Memanggil Drawer yang sudah kita styling sebelumnya */}
+      <IncidentDetailDrawer 
+        incident={enrichedSelectedIncident}
+        isOpen={!!selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+        onOpenReport={() => setIsReportModalOpen(true)}
+      />
 
       {/* ========================================================================= */}
       {/* DIALOG MODAL LAPORKAN INSIDEN ANONIM                                      */}
