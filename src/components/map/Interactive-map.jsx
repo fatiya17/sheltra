@@ -216,9 +216,9 @@ export default function InteractiveMap({ onLocationSelect }) {
     // 1. Manage Start Marker
     if (routeStart) {
       if (!routeMarkerStartRef.current) {
-        // Create custom green marker (Gojek style green circle with white upward arrow)
+        // Create custom start marker (pink circle with white upward arrow)
         const el = document.createElement("div")
-        el.className = "w-8 h-8 rounded-full bg-emerald-600 border-2 border-white shadow-lg flex items-center justify-center text-white cursor-pointer"
+        el.className = "w-8 h-8 rounded-full bg-[#ffa2cf] border-2 border-white shadow-lg flex items-center justify-center text-white cursor-pointer"
         el.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`
 
         routeMarkerStartRef.current = new mapboxgl.Marker(el)
@@ -238,7 +238,7 @@ export default function InteractiveMap({ onLocationSelect }) {
         // Create custom orange marker (Gojek style rounded orange pin-drop with white circle, anchored to bottom)
         const el = document.createElement("div")
         el.className = "w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-lg"
-        el.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ff6b00"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+        el.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
 
         routeMarkerEndRef.current = new mapboxgl.Marker({ element: el, anchor: "bottom" })
           .setLngLat([routeEnd.lng, routeEnd.lat])
@@ -510,7 +510,7 @@ export default function InteractiveMap({ onLocationSelect }) {
             
             {/* Input Row 1: Start Point */}
             <div className="flex items-center gap-3 px-3.5 py-2.5">
-              <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+              <div className="w-6 h-6 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0 shadow-xs">
                 <ArrowUp className="w-3.5 h-3.5" />
               </div>
               <div className="flex-1 relative">
@@ -544,9 +544,9 @@ export default function InteractiveMap({ onLocationSelect }) {
 
             {/* Input Row 2: Destination */}
             <div className="flex items-center gap-3 px-3.5 py-2.5">
-              <div className="w-6 h-6 rounded-full bg-orange-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white shrink-0 shadow-xs">
                 <div className="w-2.5 h-2.5 rounded-full bg-white flex items-center justify-center">
-                  <div className="w-1 h-1 rounded-full bg-orange-600" />
+                  <div className="w-1 h-1 rounded-full bg-primary" />
                 </div>
               </div>
               <div className="flex-1 relative">
