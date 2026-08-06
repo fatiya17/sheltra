@@ -161,7 +161,7 @@ export function RouteSearchForm({
             {/* mode transportasi */}
             <div className="space-y-1.5">
               <Label className="text-sm font-semibold">Mode Transportasi</Label>
-              <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-lg border border-input">
+              <div className="flex items-center gap-4 border-b border-border/60 pb-1">
                 {TRAVEL_MODES.map((mode) => {
                   const isSelected = travelMode === mode.id
                   return (
@@ -170,15 +170,16 @@ export function RouteSearchForm({
                       type="button"
                       onClick={() => setTravelMode(mode.id)}
                       title={mode.label}
-                      className={`flex items-center justify-center p-1.5 rounded-md transition-all ${
+                      className={`flex items-center justify-center gap-1.5 pb-2 text-sm font-semibold transition-all bg-transparent ${
                         isSelected
-                          ? "bg-white text-foreground shadow-xs font-medium"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "text-primary border-b-2 border-primary -mb-px"
+                          : "text-muted-foreground border-b-2 border-transparent -mb-px"
                       }`}
                     >
                       {mode.id === "walking" && <Footprints className="w-4 h-4" />}
                       {mode.id === "motorcycle" && <Bike className="w-4 h-4" />}
                       {mode.id === "car" && <Car className="w-4 h-4" />}
+                      <span>{mode.label}</span>
                     </button>
                   )
                 })}
@@ -190,8 +191,7 @@ export function RouteSearchForm({
           <Button
             type="submit"
             disabled={isLoading}
-            variant="pill"
-            size="pill"
+            variant="primary"
             className="w-full mt-2 font-medium"
           >
             {isLoading ? (
