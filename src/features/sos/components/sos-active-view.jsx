@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import Image from "next/image"
-import { Phone, MapPin, Volume2, VolumeX, Navigation, ChevronLeft, ShieldCheck, ArrowUp } from "lucide-react"
+import { Phone, MapPin, Volume2, VolumeX, Navigation, ChevronLeft, ShieldCheck, ArrowUp, Siren } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { safeRouteService } from "@/features/safe-route/services/safe-route.service"
 import { geocodeService } from "@/features/report/services/geocode.service"
+import { sosService } from "../services/sos.service"
 
 export function SosActiveView({
   activeDurationSeconds = 0,
@@ -32,6 +34,7 @@ export function SosActiveView({
 }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [showArrivedDialog, setShowArrivedDialog] = useState(false)
+  const [isArrivedSafe, setIsArrivedSafe] = useState(false)
 
   // state untuk navigasi
   const [isSafePointNavStarted, setIsSafePointNavStarted] = useState(false)
@@ -57,6 +60,8 @@ export function SosActiveView({
   const desktopPanelRef = useRef(null)
   const mobileTopCardRef = useRef(null)
   const mobileSheetRef = useRef(null)
+  const mainMapContainerRef = useRef(null)
+  const desktopMainMapContainerRef = useRef(null)
 
   // format detik ke mm:ss
   const formatTimer = (totalSeconds) => {
@@ -324,7 +329,7 @@ export function SosActiveView({
     return () => window.removeEventListener("resize", handleResize)
   }, [activeTab])
 
-  // render peta mapbox
+  // render peta mapbox untuk safe point
   useEffect(() => {
     if (activeTab !== "safepoint" || !mapContainerRef.current) return
 
@@ -364,7 +369,7 @@ export function SosActiveView({
           const startCoords = userLocation.coords || [106.8105, -6.2307]
           const endCoords = nearestSafePoint?.coordinates || startCoords
 
-          // pin origin — percis safe-route (pink soft #ffa2cf)
+          // pin asal
           const startEl = document.createElement("div")
           startEl.className = "w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl"
           startEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ffa2cf" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
@@ -373,51 +378,61 @@ export function SosActiveView({
             .setLngLat(startCoords)
             .addTo(map)
 
-          // pin tujuan — percis safe-route (rose/magenta #db2777 + circle putih)
+          // pin tujuan percis safe-route
           if (nearestSafePoint) {
             const endEl = document.createElement("div")
             endEl.className = "w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl"
-            endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#db2777" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+            endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
 
             new mapboxgl.Marker({ element: endEl, anchor: "bottom" })
               .setLngLat(endCoords)
               .addTo(map)
           }
 
-          // gambar rute abu/putih netral (dash) untuk safe point
+          // gambar rute titik-titik lingkaran bulat sempurna untuk safe point
           if (safePointRoute?.coordinates && safePointRoute.coordinates.length >= 2) {
-            map.addSource("safepoint-route-source", {
+            const updateScreenDots = () => {
+              try {
+                const source = map.getSource("safepoint-route-dots-source")
+                if (source) {
+                  source.setData(generateScreenSpaceDots(safePointRoute.coordinates, map, 20))
+                }
+              } catch (e) {}
+            }
+
+            map.addSource("safepoint-route-dots-source", {
               type: "geojson",
-              data: {
-                type: "Feature",
-                geometry: { type: "LineString", coordinates: safePointRoute.coordinates },
-              },
+              data: generateScreenSpaceDots(safePointRoute.coordinates, map, 20),
             })
-            // casing putih agar dash terlihat di atas tiles
+
+            // ring luar titik (casing putih)
             map.addLayer({
-              id: "safepoint-route-casing",
-              type: "line",
-              source: "safepoint-route-source",
-              layout: { "line-join": "round", "line-cap": "round" },
+              id: "safepoint-route-dots-casing",
+              type: "circle",
+              source: "safepoint-route-dots-source",
               paint: {
-                "line-color": "#ffffff",
-                "line-width": 9,
-                "line-opacity": 0.9,
+                "circle-radius": 5.5,
+                "circle-color": "#ffffff",
+                "circle-opacity": 0.95,
               },
             })
-            // garis utama abu terang berupa titik-titik rapi
+
+            // titik lingkaran bulat sempurna warna primary
             map.addLayer({
-              id: "safepoint-route-layer",
-              type: "line",
-              source: "safepoint-route-source",
-              layout: { "line-join": "round", "line-cap": "round" },
+              id: "safepoint-route-dots-layer",
+              type: "circle",
+              source: "safepoint-route-dots-source",
               paint: {
-                "line-color": "#9ca3af",
-                "line-width": 5,
-                "line-opacity": 1,
-                "line-dasharray": [0.02, 2.6],
+                "circle-radius": 3.8,
+                "circle-color": "#e8195a",
+                "circle-opacity": 1,
               },
             })
+
+            // update titik secara dinamis saat zoom / move agar jarak tetap konstan
+            map.on("zoom", updateScreenDots)
+            map.on("zoomend", updateScreenDots)
+            map.on("moveend", updateScreenDots)
           }
 
           // pusatkan rute/marker di area peta yang terlihat
@@ -437,6 +452,74 @@ export function SosActiveView({
       }
     }
   }, [activeTab, safePointRoute, nearestSafePoint, isDesktop])
+
+  // render peta mapbox untuk main tab (mobile & desktop)
+  useEffect(() => {
+    if (activeTab !== "main") return
+
+    const containers = [mainMapContainerRef.current, desktopMainMapContainerRef.current].filter(Boolean)
+    if (containers.length === 0) return
+
+    const maps = []
+
+    import("mapbox-gl").then((mapboxglModule) => {
+      const mapboxgl = mapboxglModule.default
+      mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
+
+      containers.forEach((container) => {
+        try {
+          const map = new mapboxgl.Map({
+            container,
+            style: "mapbox://styles/mapbox/streets-v12",
+            center: userLocation.coords || [106.8105, -6.2307],
+            zoom: 15,
+            attributionControl: false,
+            interactive: false,
+          })
+
+          maps.push(map)
+
+          map.on("load", () => {
+            map.resize()
+
+            // fallback layer google
+            map.addSource("google-tiles", {
+              type: "raster",
+              tiles: ["https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"],
+              tileSize: 256,
+            })
+            map.addLayer({
+              id: "google-layer",
+              type: "raster",
+              source: "google-tiles",
+              paint: { "raster-opacity": 1 },
+            })
+
+            const startCoords = userLocation.coords || [106.8105, -6.2307]
+
+            // pin asal
+            const startEl = document.createElement("div")
+            startEl.className = "w-10 h-10 flex items-center justify-center rounded-full bg-rose-500/20"
+            startEl.innerHTML = `<div class="w-4 h-4 rounded-full bg-rose-600 ring-2 ring-white shadow-md"></div>`
+
+            new mapboxgl.Marker({ element: startEl, anchor: "center" })
+              .setLngLat(startCoords)
+              .addTo(map)
+          })
+        } catch (err) {
+          console.warn("gagal load peta main:", err)
+        }
+      })
+    })
+
+    return () => {
+      maps.forEach((m) => {
+        try {
+          m.remove()
+        } catch (e) {}
+      })
+    }
+  }, [activeTab, userLocation.coords])
 
   // tampilan tab safe point
   if (activeTab === "safepoint") {
@@ -466,7 +549,7 @@ export function SosActiveView({
                 <div className="bg-white border-b border-input p-3 space-y-1.5">
                   {/* titik asal */}
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0">
+                    <div className="w-5 h-5 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0">
                       <ArrowUp className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">
@@ -476,7 +559,7 @@ export function SosActiveView({
 
                   {/* titik tujuan */}
                   <div className="flex items-center gap-2">
-                    <div className="relative w-5 h-5 rounded-full bg-[#db2777] shrink-0">
+                    <div className="relative w-5 h-5 rounded-full bg-primary shrink-0">
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" />
                     </div>
                     <p className="text-sm font-medium text-foreground truncate">
@@ -518,8 +601,8 @@ export function SosActiveView({
                   {nearestSafePoint && (
                     <Button
                       type="button"
-                      variant="outline"
-                      className="h-10 rounded-xl font-semibold text-[14px] bg-[#d6e4f0] hover:bg-[#c2d7e7] text-slate-800 border-none gap-1.5"
+                      variant="secondary"
+                      className="h-10 rounded-xl font-semibold text-[14px] gap-1.5"
                       onClick={() => {
                         if (isSafePointNavStarted) {
                           setShowArrivedDialog(true)
@@ -534,8 +617,7 @@ export function SosActiveView({
                   )}
                   <Button
                     type="button"
-                    variant="pill"
-                    size="pill"
+                    variant="primary"
                     className={nearestSafePoint ? "" : "col-span-2"}
                     onClick={() => setShowCancelDialog(true)}
                   >
@@ -585,7 +667,7 @@ export function SosActiveView({
               <div className="p-3 space-y-1.5">
                 {/* asal */}
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0">
+                  <div className="w-4 h-4 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0">
                     <ArrowUp className="w-2.5 h-2.5 stroke-[3]" />
                   </div>
                   <p className="text-sm font-medium text-foreground truncate">
@@ -595,7 +677,7 @@ export function SosActiveView({
 
                 {/* tujuan */}
                 <div className="flex items-center gap-2">
-                  <div className="relative w-4 h-4 rounded-full bg-[#db2777] shrink-0">
+                  <div className="relative w-4 h-4 rounded-full bg-primary shrink-0">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white" />
                   </div>
                   <p className="text-sm font-medium text-foreground truncate">
@@ -696,8 +778,8 @@ export function SosActiveView({
                 {nearestSafePoint && (
                   <Button
                     type="button"
-                    variant="outline"
-                    className="h-11 rounded-2xl font-semibold text-[14px] bg-[#d6e4f0] hover:bg-[#c2d7e7] text-slate-800 border-none gap-1.5"
+                    variant="secondary"
+                    className="h-11 rounded-2xl font-semibold text-[14px] gap-1.5"
                     onClick={() => {
                       if (isSafePointNavStarted) {
                         setShowArrivedDialog(true)
@@ -713,8 +795,7 @@ export function SosActiveView({
 
                 <Button
                   type="button"
-                  variant="pill"
-                  size="pill"
+                  variant="primary"
                   className={nearestSafePoint ? "" : "col-span-2"}
                   onClick={() => setShowCancelDialog(true)}
                 >
@@ -746,11 +827,48 @@ export function SosActiveView({
               setShowArrivedDialog(false)
               setIsSafePointNavStarted(false)
               setSafePointRoute(null)
+              try {
+                sosService.stopAlarm()
+              } catch (e) {}
+              setIsArrivedSafe(true)
             }}
           />
         </div>
       )
     }
+  }
+
+  // tampilan jika sudah sampai di tujuan dengan selamat
+  if (isArrivedSafe) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-6 max-w-md mx-auto select-none">
+        <img
+          src="/safe.svg"
+          alt="Aman"
+          className="w-40 h-40 object-contain mb-2"
+        />
+        <div className="space-y-3">
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-800">
+            Trip Selesai
+          </h2>
+          <p className="text-slate-600 text-base px-2 leading-relaxed max-w-sm mx-auto">
+            Semoga kamu sudah benar aman ya.
+          </p>
+        </div>
+        <Button
+          asChild
+          variant="primary"
+          className="w-full mt-6 max-w-sm h-12 text-base rounded-xl font-semibold shadow-md shadow-primary/20"
+          onClick={() => {
+            if (typeof onCancelSos === "function") {
+              onCancelSos()
+            }
+          }}
+        >
+          <Link href="/">Kembali ke Beranda</Link>
+        </Button>
+      </div>
+    )
   }
 
   // ----------------------------------------------------------------
@@ -763,7 +881,7 @@ export function SosActiveView({
         {/* header banner */}
         <div className="-mx-4 -mt-4 bg-[#e62058] text-white px-4 py-3.5 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-            <span className="text-base font-black">!</span>
+            <Siren className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold leading-tight">SOS Aktif</p>
@@ -778,26 +896,19 @@ export function SosActiveView({
           </button>
         </div>
 
-        {/* peta */}
+        {/* peta aktif asli */}
         <div
           className="w-full rounded-2xl bg-slate-100 dark:bg-slate-800 relative flex items-center justify-center overflow-hidden border border-border/40 shadow-xs mt-3"
-          style={{ height: "46vw", maxHeight: 260, minHeight: 180 }}
+          style={{ height: "57vw", maxHeight: 325, minHeight: 225 }}
         >
-          <div className="flex flex-col items-center gap-2 text-slate-400">
-            <MapPin className="w-8 h-8 text-[#e62058]" />
-            <p className="text-xs font-medium">
-              {userLocation.hasGps
-                ? `${userLocation.coords?.[1]?.toFixed(4)}, ${userLocation.coords?.[0]?.toFixed(4)}`
-                : "Lokasi tidak tersedia"}
-            </p>
-          </div>
-          <div className="absolute top-3 right-3 bg-black/60 text-white text-xs font-mono font-bold px-2.5 py-1 rounded-full">
+          <div ref={mainMapContainerRef} className="w-full h-full" />
+          <div className="absolute top-3 right-3 bg-black/60 text-white text-xs font-mono font-bold px-2.5 py-1 rounded-full z-10 pointer-events-none">
             {formatTimer(activeDurationSeconds)}
           </div>
         </div>
 
         {/* info kontak */}
-        <div className="mt-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-2xl px-4 py-3 flex items-center gap-3">
+        <div className="mt-4 bg-[#FCF5F6] border border-[#F8E8ED] rounded-2xl px-4 py-[14px] flex items-center gap-3">
           <div className="flex items-center shrink-0">
             {trustedContacts.slice(0, 2).map((c, i) => (
               <div
@@ -814,10 +925,10 @@ export function SosActiveView({
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold text-[#e62058]">
+            <p className="text-sm font-semibold text-[#C00D53]">
               {trustedContacts.length} Trusted Contact diberi tahu
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-sm text-[#C00D53] mt-0.5">
               Lokasi & waktu diberikan otomatis
             </p>
           </div>
@@ -836,7 +947,7 @@ export function SosActiveView({
           <Button
             type="button"
             variant="outline"
-            className="h-12 rounded-2xl font-bold text-sm border-[#e62058] text-[#e62058] hover:bg-rose-50 dark:hover:bg-rose-950/30"
+            className="h-12 rounded-2xl font-bold text-sm border-primary text-primary bg-white hover:bg-rose-50"
             onClick={() => setActiveTab("safepoint")}
           >
             Safe Point
@@ -861,7 +972,7 @@ export function SosActiveView({
       <div className="hidden lg:block fixed top-0 left-0 right-0 z-50 bg-[#e62058] text-white shadow-md">
         <div className="w-full px-6 py-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-            <span className="text-base font-black">!</span>
+            <Siren className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold leading-tight">SOS Aktif</p>
@@ -897,23 +1008,19 @@ export function SosActiveView({
 
           {/* kolom kiri: peta + info kontak */}
           <div className="space-y-4">
-            {/* peta */}
+            {/* peta aktif desktop */}
             <div
-              className="w-full rounded-2xl bg-slate-100 dark:bg-slate-800 relative flex items-center justify-center overflow-hidden"
-              style={{ height: desktopEmbedded ? "clamp(360px, 48vh, 520px)" : 240 }}
+              className="w-full rounded-2xl bg-slate-100 dark:bg-slate-800 relative flex items-center justify-center overflow-hidden border border-border/40 shadow-xs"
+              style={{ height: desktopEmbedded ? "clamp(360px, 48vh, 520px)" : 280 }}
             >
-              <div className="flex flex-col items-center gap-2 text-slate-400">
-                <MapPin className="w-8 h-8 text-[#e62058]" />
-                <p className="text-xs font-medium">
-                  {userLocation.hasGps
-                    ? `${userLocation.coords?.[1]?.toFixed(4)}, ${userLocation.coords?.[0]?.toFixed(4)}`
-                    : "Lokasi tidak tersedia"}
-                </p>
+              <div ref={desktopMainMapContainerRef} className="w-full h-full" />
+              <div className="absolute top-3 right-3 bg-black/60 text-white text-xs font-mono font-bold px-2.5 py-1 rounded-full z-10 pointer-events-none">
+                {formatTimer(activeDurationSeconds)}
               </div>
             </div>
 
             {/* info kontak tepercaya */}
-            <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-2xl px-4 py-3 flex items-center gap-3">
+            <div className="bg-[#FCF5F6] border border-[#F8E8ED] rounded-2xl px-4 py-[14px] flex items-center gap-3">
               <div className="flex items-center shrink-0">
                 {trustedContacts.slice(0, 2).map((c, i) => (
                   <div
@@ -930,10 +1037,10 @@ export function SosActiveView({
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-[#e62058]">
+                <p className="text-sm font-semibold text-[#C00D53]">
                   {trustedContacts.length} Trusted Contact diberi tahu
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-sm text-[#C00D53] mt-0.5">
                   Lokasi & waktu diberikan otomatis
                 </p>
               </div>
@@ -954,7 +1061,7 @@ export function SosActiveView({
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 rounded-2xl font-bold text-sm border-[#e62058] text-[#e62058] hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                className="h-12 rounded-2xl font-bold text-sm border-primary text-primary bg-white hover:bg-rose-50"
                 onClick={() => setActiveTab("safepoint")}
               >
                 Safe Point
@@ -983,15 +1090,19 @@ export function SosActiveView({
            onCancelSos()
          }}
        />
-       <ArrivedDialog
-         open={showArrivedDialog}
-         onClose={() => setShowArrivedDialog(false)}
-         onConfirm={() => {
-           setShowArrivedDialog(false)
-           setIsSafePointNavStarted(false)
-           setSafePointRoute(null)
-         }}
-       />
+        <ArrivedDialog
+          open={showArrivedDialog}
+          onClose={() => setShowArrivedDialog(false)}
+          onConfirm={() => {
+            setShowArrivedDialog(false)
+            setIsSafePointNavStarted(false)
+            setSafePointRoute(null)
+            try {
+              sosService.stopAlarm()
+            } catch (e) {}
+            setIsArrivedSafe(true)
+          }}
+        />
      </>
    )
  }
@@ -1140,8 +1251,7 @@ function CancelDialog({ open, onClose, onConfirm }) {
         <div className="w-full">
           <Button
             type="button"
-            variant="pill"
-            size="pill"
+            variant="primary"
             className="w-full"
             onClick={onConfirm}
           >
@@ -1157,9 +1267,13 @@ function ArrivedDialog({ open, onClose, onConfirm }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-[380px] bg-white p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
-        <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-          <ShieldCheck className="w-8 h-8 text-emerald-600" />
-        </div>
+        <Image
+          src="/success.svg"
+          alt="Sudah Sampai dengan Aman"
+          width={128}
+          height={128}
+          className="w-32 h-32 object-contain"
+        />
         <div className="space-y-2">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold tracking-tight text-slate-800">
@@ -1174,7 +1288,6 @@ function ArrivedDialog({ open, onClose, onConfirm }) {
           <Button
             type="button"
             variant="outline"
-            size="pill"
             className="w-full"
             onClick={onClose}
           >
@@ -1182,8 +1295,7 @@ function ArrivedDialog({ open, onClose, onConfirm }) {
           </Button>
           <Button
             type="button"
-            variant="pill"
-            size="pill"
+            variant="primary"
             className="w-full"
             onClick={onConfirm}
           >
@@ -1194,3 +1306,51 @@ function ArrivedDialog({ open, onClose, onConfirm }) {
     </Dialog>
   )
 }
+
+// interpolasi titik-titik lingkaran sempurna berbasis piksel layar konstan
+function generateScreenSpaceDots(coordinates, map, pixelSpacing = 20) {
+  if (!coordinates || coordinates.length < 2 || !map || typeof map.project !== "function") {
+    return { type: "FeatureCollection", features: [] }
+  }
+
+  const features = []
+  let leftover = 0
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const c1 = coordinates[i]
+    const c2 = coordinates[i + 1]
+    const p1 = map.project(c1)
+    const p2 = map.project(c2)
+
+    const dx = p2.x - p1.x
+    const dy = p2.y - p1.y
+    const segPixelDist = Math.sqrt(dx * dx + dy * dy)
+
+    if (segPixelDist <= 0) continue
+
+    let dist = leftover > 0 ? leftover : 0
+    while (dist <= segPixelDist) {
+      const t = dist / segPixelDist
+      const x = p1.x + dx * t
+      const y = p1.y + dy * t
+      const unprojected = map.unproject([x, y])
+
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Point",
+          coordinates: [unprojected.lng, unprojected.lat],
+        },
+      })
+      dist += pixelSpacing
+    }
+    leftover = dist - segPixelDist
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  }
+}
+
