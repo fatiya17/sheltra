@@ -26,7 +26,7 @@ function createCustomPinElement() {
   el.style.height = "72px"
   el.innerHTML = `
     <svg class="relative z-10 -mb-[16px]" viewBox="0 0 38 48" width="32" height="40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#db2777" stroke="#ffffff" stroke-width="2.5"/>
+      <path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.5"/>
       <circle cx="19" cy="19" r="6.5" fill="#ffffff"/>
     </svg>
     <div class="relative flex items-center justify-center w-12 h-12">
@@ -195,7 +195,7 @@ function ManualLocationMap({ onLocationUpdate }) {
   )
 }
 
-export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
+export function LocationPicker({ value, onChange, onAddressDetailsChange, errorMessage, hasError }) {
   const toast = useToast()
   const [dialogMode, setDialogMode] = useState(null)
   const [isDetectingGPS, setIsDetectingGPS] = useState(false)
@@ -303,8 +303,9 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
         <MapPin className="absolute left-3 w-4 h-4 text-primary pointer-events-none" />
         <Input
           placeholder="Contoh: Jl. Margonda Raya dekat Halte Stasiun UI"
-          className="pl-9 focus:!border-primary focus:!ring-primary aria-invalid:focus:!border-primary aria-invalid:focus:!ring-primary"
+          className="pl-9 focus:!border-primary focus:!ring-primary aria-invalid:border-red-500 aria-invalid:focus:!border-red-500 aria-invalid:focus:!ring-red-500"
           value={value}
+          aria-invalid={hasError ? "true" : "false"}
           onChange={(e) => {
             onChange(e.target.value)
             if (onAddressDetailsChange) onAddressDetailsChange(null)
@@ -315,7 +316,7 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
       <div className="grid grid-cols-2 gap-3">
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           onClick={openAutoDialog}
           className="focus:border-primary focus:ring-primary"
         >
@@ -324,14 +325,17 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
         </Button>
         <Button
           type="button"
-          variant="pill"
-          size="pill"
+          variant="primary"
           onClick={openManualDialog}
         >
           <Pencil className="w-4 h-4" />
           Ubah Manual
         </Button>
       </div>
+
+      {errorMessage && (
+        <p className="text-xs font-medium text-red-500 mt-1">{errorMessage}</p>
+      )}
 
       {/* dialog deteksi lokasi otomatis */}
       <Dialog open={dialogMode === "auto"} onOpenChange={(open) => !open && closeDialog()}>
@@ -383,8 +387,7 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
             {!isDetectingGPS && pendingLocation && !gpsFailed && (
               <Button
                 type="button"
-                variant="pill"
-                size="pill"
+                variant="primary"
                 onClick={confirmLocation}
                 className="flex-1"
               >
@@ -394,8 +397,7 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
             {gpsFailed && (
               <Button
                 type="button"
-                variant="pill"
-                size="pill"
+                variant="primary"
                 onClick={() => {
                   closeDialog()
                   openManualDialog()
@@ -407,7 +409,7 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
             )}
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={closeDialog}
               className="flex-1 focus:border-primary focus:ring-primary"
             >
@@ -460,8 +462,7 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
           <div className="flex gap-3 pt-2">
             <Button
               type="button"
-              variant="pill"
-              size="pill"
+              variant="primary"
               onClick={confirmLocation}
               disabled={!pendingLocation.trim()}
               className="flex-1"
@@ -470,7 +471,7 @@ export function LocationPicker({ value, onChange, onAddressDetailsChange }) {
             </Button>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={closeDialog}
               className="flex-1 focus:border-primary focus:ring-primary"
             >
