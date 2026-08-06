@@ -17,10 +17,11 @@ import {
   Footprints,
   Bike,
   Car,
-  CheckCircle2,
+  Square,
 } from "lucide-react"
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, TRAVEL_MODES } from "../constants/safe-route.constants"
 import { RiskTimeline } from "./risk-timeline"
+import { SafeRouteNavSimulation } from "./safe-route-nav-simulation"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/toast"
 import "mapbox-gl/dist/mapbox-gl.css"
@@ -418,12 +419,21 @@ export function SafeRouteMapView({
 
   // handler mulai navigasi
   const handleStartNavigation = () => {
-    setIsNavigating(true)
-    toast({
-      title: "Navigasi Aman Aktif",
-      body: "Navigasi aktif mendampingi perjalanan Anda sepanjang rute protokol aman.",
-      type: "success",
-    })
+    if (isNavigating) {
+      setIsNavigating(false)
+      toast({
+        title: "Navigasi Dihentikan",
+        body: "Simulasi navigasi telah dihentikan.",
+        type: "default",
+      })
+    } else {
+      setIsNavigating(true)
+      toast({
+        title: "Navigasi Dimulai",
+        body: "Simulasi panduan arah dimulai. Ikuti instruksi di layar.",
+        type: "success",
+      })
+    }
   }
 
   return (
@@ -431,59 +441,61 @@ export function SafeRouteMapView({
       {/* kontainer canvas mapbox penuh */}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" />
 
-      {/* TOP FLOATING SEARCH BAR (RESPONSIF) */}
-      <div className="absolute top-4 left-4 right-4 md:left-6 md:right-auto md:w-[420px] z-30 pointer-events-auto">
-        <div
-          onClick={onOpenSearch}
-          className="bg-card/95 backdrop-blur-md rounded-2xl border border-input shadow-lg overflow-hidden cursor-pointer hover:border-primary/50 transition-all"
-        >
-          <div className="p-3.5 space-y-2">
-            {/* titik jemput */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0 shadow-2xs">
-                <ArrowUp className="w-3 h-3 stroke-[3]" />
-              </div>
-              <p className="text-sm font-semibold text-foreground truncate">
-                {routeData?.origin?.label || "Stasiun Sudirman"}
-              </p>
-            </div>
-
-            {/* titik tujuan */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-5 h-5 rounded-full bg-[#db2777] flex items-center justify-center text-white shrink-0 shadow-2xs">
-                <div className="w-2 h-2 rounded-full bg-white flex items-center justify-center">
-                  <div className="w-1 h-1 rounded-full bg-[#db2777]" />
+      {/* TOP FLOATING SEARCH BAR (RESPONSIF) — disembunyikan saat navigasi aktif di mobile */}
+      {!isNavigating && (
+        <div className="absolute top-4 left-4 right-4 md:left-6 md:right-auto md:w-[420px] z-30 pointer-events-auto">
+          <div
+            onClick={onOpenSearch}
+            className="bg-white/95 backdrop-blur-md rounded-2xl border border-input shadow-lg overflow-hidden cursor-pointer hover:border-primary/50 transition-all"
+          >
+            <div className="p-3.5 space-y-2">
+              {/* titik jemput */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0 shadow-2xs">
+                  <ArrowUp className="w-3 h-3 stroke-[3]" />
                 </div>
+                <p className="text-sm font-semibold text-foreground truncate">
+                  {routeData?.origin?.label || "Stasiun Sudirman"}
+                </p>
               </div>
-              <p className="text-sm font-semibold text-foreground truncate">
-                {routeData?.destination?.label || "Jl. Senopati No. 45"}
-              </p>
-            </div>
-          </div>
 
-          {/* banner strip primary */}
-          <div className="bg-primary px-3.5 py-2 text-primary-foreground flex items-center justify-between text-sm font-semibold">
-            <span className="flex items-center gap-1.5 truncate">
-              {isBlankSpot ? (
-                <>
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-900 shrink-0" />
-                  <span className="truncate">Data Keamanan Terbatas di Area Ini</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-primary-foreground shrink-0" />
-                  <span className="truncate">
-                    Rute Teraman Terpilih • {activeRoute?.safePointsCount || 5} Safe Points 24 Jam
-                  </span>
-                </>
-              )}
-            </span>
-            <Badge variant="outline" className="bg-background/20 text-primary-foreground border-transparent text-[11px] shrink-0">
-              {routeData?.departureTime || "20:00"}
-            </Badge>
+              {/* titik tujuan */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-5 h-5 rounded-full bg-[#db2777] flex items-center justify-center text-white shrink-0 shadow-2xs">
+                  <div className="w-2 h-2 rounded-full bg-white flex items-center justify-center">
+                    <div className="w-1 h-1 rounded-full bg-[#db2777]" />
+                  </div>
+                </div>
+                <p className="text-sm font-semibold text-foreground truncate">
+                  {routeData?.destination?.label || "Jl. Senopati No. 45"}
+                </p>
+              </div>
+            </div>
+
+            {/* banner strip primary */}
+            <div className="bg-primary px-3.5 py-2 text-primary-foreground flex items-center justify-between text-sm font-semibold">
+              <span className="flex items-center gap-1.5 truncate">
+                {isBlankSpot ? (
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-900 shrink-0" />
+                    <span className="truncate">Data Keamanan Terbatas di Area Ini</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-primary-foreground shrink-0" />
+                    <span className="truncate">
+                      Rute Teraman Terpilih • {activeRoute?.safePointsCount || 5} Safe Points 24 Jam
+                    </span>
+                  </>
+                )}
+              </span>
+              <Badge variant="outline" className="bg-background/20 text-primary-foreground border-transparent text-[11px] shrink-0">
+                {routeData?.departureTime || "20:00"}
+              </Badge>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* FLOATING ACTION BUTTONS DI PETA */}
       <div className="absolute top-36 left-4 md:top-4 md:right-6 md:left-auto z-20 flex flex-wrap md:flex-col gap-2 pointer-events-auto">
@@ -491,7 +503,7 @@ export function SafeRouteMapView({
         <button
           type="button"
           onClick={onBack}
-          className="w-10 h-10 rounded-full bg-card/95 hover:bg-card border border-input shadow-lg flex items-center justify-center text-foreground transition-all"
+          className="w-10 h-10 rounded-full bg-white/95 hover:bg-white border border-input shadow-lg flex items-center justify-center text-foreground transition-all"
           title="Kembali ke Beranda"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -504,7 +516,7 @@ export function SafeRouteMapView({
           className={`px-3 py-1.5 rounded-full border text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all ${
             showSafePoints
               ? "bg-blue-600 text-white border-blue-700"
-              : "bg-card/90 text-muted-foreground border-input"
+              : "bg-white/90 text-muted-foreground border-input"
           }`}
         >
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -518,7 +530,7 @@ export function SafeRouteMapView({
           className={`px-3 py-1.5 rounded-full border text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all ${
             showRiskZones
               ? "bg-rose-600 text-white border-rose-700"
-              : "bg-card/90 text-muted-foreground border-input"
+              : "bg-white/90 text-muted-foreground border-input"
           }`}
         >
           <AlertTriangle className="w-3.5 h-3.5" />
@@ -527,7 +539,7 @@ export function SafeRouteMapView({
       </div>
 
       {/* BOTTOM SHEET / SIDE PANEL (RESPONSIF) */}
-      <div className="absolute bottom-0 md:bottom-6 left-0 right-0 md:left-6 md:right-auto md:w-[420px] z-30 bg-card/98 backdrop-blur-xl border-t md:border border-input md:rounded-3xl rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
+      <div className="absolute bottom-0 md:bottom-6 left-0 right-0 md:left-6 md:right-auto md:w-[420px] z-30 bg-white/98 backdrop-blur-xl border-t md:border border-input md:rounded-3xl rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
         {/* drag handle bar (hanya tampil di mobile) */}
         <div
           onTouchStart={handleTouchStart}
@@ -562,138 +574,181 @@ export function SafeRouteMapView({
             dragOffset > 0 ? "" : "transition-all duration-300 ease-out"
           } ${sheetState === "minimized" ? "pointer-events-none pb-0" : "pb-2"}`}
         >
-            {/* mode transportasi tabs */}
-            <div className="flex items-center gap-2 border-b border-border/60 pb-2">
-              {TRAVEL_MODES.map((mode) => {
-                const isSelected = (routeData?.travelMode || "walking") === mode.id
-                return (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => onModeChange && onModeChange(mode.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
-                    {mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}
-                    {mode.id === "car" && <Car className="w-3.5 h-3.5" />}
-                    <span>{mode.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* daftar alternatif rute */}
-            <div className="space-y-2.5">
-              {routes.map((route) => {
-                const isSelected = selectedRouteId === route.id
-                return (
-                  <div
-                    key={route.id}
-                    onClick={() => onSelectRoute(route.id)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 relative select-none ${
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-                        : "border-input bg-card hover:bg-muted/30"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-2xl bg-primary/15 text-foreground flex items-center justify-center font-semibold shrink-0">
-                          {routeData?.travelMode === "walking" ? (
-                            <Footprints className="w-5 h-5 text-primary" />
-                          ) : routeData?.travelMode === "car" ? (
-                            <Car className="w-5 h-5 text-primary" />
-                          ) : (
-                            <Bike className="w-5 h-5 text-primary" />
-                          )}
-                        </div>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-semibold text-foreground">
-                              {route.title}
-                            </p>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {route.duration} • {route.distance}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* skor keamanan & radio selector */}
-                      <div className="flex items-center gap-2">
-                        {route.isBlankSpot ? (
-                          <Badge variant="yellow">Data Terbatas</Badge>
-                        ) : route.safetyScore >= 80 ? (
-                          <Badge variant="pink">
-                            Skor {route.safetyScore} ({route.riskLevel})
-                          </Badge>
-                        ) : (
-                          <Badge variant="orange">
-                            Skor {route.safetyScore} ({route.riskLevel})
-                          </Badge>
-                        )}
-
-                        <div
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            isSelected
-                              ? "border-primary bg-primary"
-                              : "border-muted-foreground/50"
-                          }`}
-                        >
-                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* rincian pencahayaan & safe points */}
-                    {!route.isBlankSpot && (
-                      <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
-                        <span className="flex items-center gap-1">
-                          <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                          <strong>{route.safePointsCount} Safe Points 24 Jam</strong>
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Sun className="w-3.5 h-3.5 text-amber-500" />
-                          Pencahayaan: <strong>{route.lightingScore}%</strong>
-                        </span>
-                      </div>
-                    )}
-
-                    {/* disclaimer jika blank spot */}
-                    {route.isBlankSpot && route.disclaimer && (
-                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-tight">
-                        {route.disclaimer}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* section prediksi risiko per jam jika expanded */}
-            {sheetState === "expanded" && routeData && (
-              <div className="pt-2 pb-1 border-t border-border/60 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h3 className="text-[13px] font-bold text-foreground mb-3 flex items-center gap-1.5">
-                  <Navigation className="w-4 h-4 text-primary" />
-                  Rincian Perjalanan
-                </h3>
-                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-[9px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-muted-foreground/20 before:to-transparent">
-                  <RiskTimeline
-                    timeAnalysis={routeData.timeRiskAnalysis}
-                    selectedTime={routeData.departureTime}
-                    onSelectTime={onTimeChange}
-                  />
-                </div>
-              </div>
-            )}
+          {/* mode transportasi tabs */}
+          <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+            {TRAVEL_MODES.map((mode) => {
+              const isSelected = (routeData?.travelMode || "walking") === mode.id
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => onModeChange && onModeChange(mode.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                    isSelected
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
+                  {mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}
+                  {mode.id === "car" && <Car className="w-3.5 h-3.5" />}
+                  <span>{mode.label}</span>
+                </button>
+              )
+            })}
           </div>
 
+          {isNavigating && activeRoute ? (
+            <div className="space-y-4">
+              <div className="bg-white border border-input rounded-2xl p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0">
+                    <ArrowUp className="w-3 h-3 stroke-[3]" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {routeData?.origin?.label || "Stasiun Sudirman"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative w-5 h-5 rounded-full bg-[#db2777] shrink-0">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {routeData?.destination?.label || "Jl. Senopati No. 45"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-primary px-3 py-1.5 text-primary-foreground flex items-center justify-between text-xs font-semibold rounded-xl">
+                <span className="truncate">Ikuti rute menuju tujuan</span>
+                <span className="bg-background/20 text-primary-foreground border-transparent text-[11px] px-2 py-0.5 rounded-full">
+                  {activeRoute.duration} • {activeRoute.distance}
+                </span>
+              </div>
+
+              <SafeRouteNavSimulation route={activeRoute} safePoints={safePoints} />
+
+              <button
+                type="button"
+                onClick={() => setIsNavigating(false)}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold transition-colors"
+              >
+                <Square className="w-3.5 h-3.5" />
+                Matikan Navigasi
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* daftar alternatif rute */}
+              <div className="space-y-2.5">
+                {routes.map((route) => {
+                  const isSelected = selectedRouteId === route.id
+                  return (
+                    <div
+                      key={route.id}
+                      onClick={() => onSelectRoute(route.id)}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 relative select-none ${
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                          : "border-input bg-white hover:bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-2xl bg-primary/15 text-foreground flex items-center justify-center font-semibold shrink-0">
+                            {routeData?.travelMode === "walking" ? (
+                              <Footprints className="w-5 h-5 text-primary" />
+                            ) : routeData?.travelMode === "car" ? (
+                              <Car className="w-5 h-5 text-primary" />
+                            ) : (
+                              <Bike className="w-5 h-5 text-primary" />
+                            )}
+                          </div>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-semibold text-foreground">
+                                {route.title}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {route.duration} • {route.distance}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* skor keamanan & radio selector */}
+                        <div className="flex items-center gap-2">
+                          {route.isBlankSpot ? (
+                            <Badge variant="yellow">Data Terbatas</Badge>
+                          ) : route.safetyScore >= 80 ? (
+                            <Badge variant="pink">
+                              Skor {route.safetyScore} ({route.riskLevel})
+                            </Badge>
+                          ) : (
+                            <Badge variant="orange">
+                              Skor {route.safetyScore} ({route.riskLevel})
+                            </Badge>
+                          )}
+
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              isSelected
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/50"
+                            }`}
+                          >
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* rincian pencahayaan & safe points */}
+                      {!route.isBlankSpot && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
+                          <span className="flex items-center gap-1">
+                            <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                            <strong>{route.safePointsCount} Safe Points 24 Jam</strong>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Sun className="w-3.5 h-3.5 text-amber-500" />
+                            Pencahayaan: <strong>{route.lightingScore}%</strong>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* disclaimer jika blank spot */}
+                      {route.isBlankSpot && route.disclaimer && (
+                        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-tight">
+                          {route.disclaimer}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* section prediksi risiko per jam jika expanded */}
+              {sheetState === "expanded" && routeData && (
+                <div className="pt-2 pb-1 border-t border-border/60 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <h3 className="text-[13px] font-bold text-foreground mb-3 flex items-center gap-1.5">
+                    <Navigation className="w-4 h-4 text-primary" />
+                    Rincian Perjalanan
+                  </h3>
+                  <div className="space-y-4 relative before:absolute before:inset-0 before:ml-[9px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-muted-foreground/20 before:to-transparent">
+                    <RiskTimeline
+                      timeAnalysis={routeData.timeRiskAnalysis}
+                      selectedTime={routeData.departureTime}
+                      onSelectTime={onTimeChange}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* BOTTOM ACTION BAR (MENYATU RAPI DI DASAR SHEET) */}
-        <div className="p-3 md:p-4 border-t border-border/60 bg-card shrink-0 flex items-center gap-2.5 md:gap-3 shadow-lg">
+        <div className="p-3 md:p-4 border-t border-border/60 bg-white shrink-0 flex items-center gap-2.5 md:gap-3 shadow-lg">
           <button
             type="button"
             onClick={handleShareTracking}
@@ -711,8 +766,8 @@ export function SafeRouteMapView({
           >
             {isNavigating ? (
               <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Navigasi Sedang Berjalan</span>
+                <Square className="w-4 h-4" />
+                <span>Matikan Navigasi</span>
               </>
             ) : (
               <>
