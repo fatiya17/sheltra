@@ -52,9 +52,9 @@
 :root {
   --background: #cadae9;
   --foreground: #1e293b;
-  --card: #fefbf4;
+  --card: #ffffff;
   --card-foreground: #1e293b;
-  --popover: #fefbf4;
+  --popover: #ffffff;
   --popover-foreground: #1e293b;
   --primary: #ffa2cf;
   --primary-foreground: #1e293b;
@@ -75,7 +75,7 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: #fefbf4;
+  --sidebar: #ffffff;
   --sidebar-foreground: #1e293b;
   --sidebar-primary: #ffa2cf;
   --sidebar-primary-foreground: #1e293b;
@@ -179,4 +179,13 @@ dialog.astryx-lightbox button,
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(148, 163, 184, 0.6);
+}
+
+/* Utility: completely hide native scrollbars while keeping scroll behavior */
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
 }
