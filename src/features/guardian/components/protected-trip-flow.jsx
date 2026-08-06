@@ -397,7 +397,7 @@ export default function ProtectedTripFlow() {
               variant="primary"
               className="w-full mt-6 max-w-sm h-12 text-base rounded-xl font-semibold shadow-md shadow-primary/20"
             >
-              <Link href="/safe-route">Selesai</Link>
+              <Link href="/">Selesai</Link>
             </Button>
           </div>
         )}
