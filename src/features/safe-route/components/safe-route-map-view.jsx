@@ -248,64 +248,72 @@ export function SafeRouteMapView({
         routes.forEach((route) => {
           const sourceId = `route-source-${route.id}`
           const layerId = `route-layer-${route.id}`
+          const dotsSourceId = `route-dots-source-${route.id}`
+          const dotsCasingId = `route-dots-casing-${route.id}`
+          const dotsLayerId = `route-dots-layer-${route.id}`
 
-          if (map.getLayer(layerId)) {
-            map.removeLayer(layerId)
-          }
-
-          if (map.getSource(sourceId)) {
-            map.removeSource(sourceId)
-          }
+          if (map.getLayer(layerId)) map.removeLayer(layerId)
+          if (map.getLayer(dotsLayerId)) map.removeLayer(dotsLayerId)
+          if (map.getLayer(dotsCasingId)) map.removeLayer(dotsCasingId)
+          if (map.getSource(sourceId)) map.removeSource(sourceId)
+          if (map.getSource(dotsSourceId)) map.removeSource(dotsSourceId)
         })
 
-        // gambar garis rute
-        if (activeRoute) {
+        // gambar titik-titik lingkaran rute
+        if (activeRoute && activeRoute.coordinates?.length >= 2) {
           const route = activeRoute
-          const sourceId = `route-source-${route.id}`
-          const layerId = `route-layer-${route.id}`
-          const isSelected = route.id === selectedRouteId
+          const dotsSourceId = `route-dots-source-${route.id}`
+          const dotsCasingId = `route-dots-casing-${route.id}`
+          const dotsLayerId = `route-dots-layer-${route.id}`
 
-          const geojson = {
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: route.coordinates,
-            },
+          const updateScreenDots = () => {
+            try {
+              const src = map.getSource(dotsSourceId)
+              if (src) {
+                src.setData(generateScreenSpaceDots(route.coordinates, map, 20))
+              }
+            } catch (e) {}
           }
 
-          if (map.getSource(sourceId)) {
-            map.getSource(sourceId).setData(geojson)
+          const dotsGeoJson = generateScreenSpaceDots(route.coordinates, map, 20)
+          if (!map.getSource(dotsSourceId)) {
+            map.addSource(dotsSourceId, { type: "geojson", data: dotsGeoJson })
           } else {
-            map.addSource(sourceId, {
-              type: "geojson",
-              data: geojson,
-            })
+            map.getSource(dotsSourceId).setData(dotsGeoJson)
+          }
 
+          if (!map.getLayer(dotsCasingId)) {
             map.addLayer({
-              id: layerId,
-              type: "line",
-              source: sourceId,
-              layout: {
-                "line-join": "round",
-                "line-cap": "round",
-              },
+              id: dotsCasingId,
+              type: "circle",
+              source: dotsSourceId,
               paint: {
-                "line-color": route.color || (isSelected ? "#ffa2cf" : "#94a3b8"),
-                "line-width": isSelected ? 7 : 4,
-                "line-opacity": 1,
+                "circle-radius": 5.5,
+                "circle-color": "#ffffff",
+                "circle-opacity": 0.95,
               },
             })
+          }
 
-            map.on("click", layerId, () => {
-              if (onSelectRoute) onSelectRoute(route.id)
+          if (!map.getLayer(dotsLayerId)) {
+            map.addLayer({
+              id: dotsLayerId,
+              type: "circle",
+              source: dotsSourceId,
+              paint: {
+                "circle-radius": 3.8,
+                "circle-color": route.color || "#e8195a",
+                "circle-opacity": 1,
+              },
             })
           }
 
-          if (map.getLayer(layerId)) {
-            map.setPaintProperty(layerId, "line-width", isSelected ? 7 : 4)
-            map.setPaintProperty(layerId, "line-opacity", 1)
-          }
+          map.off("zoom", updateScreenDots)
+          map.off("zoomend", updateScreenDots)
+          map.off("moveend", updateScreenDots)
+          map.on("zoom", updateScreenDots)
+          map.on("zoomend", updateScreenDots)
+          map.on("moveend", updateScreenDots)
         }
 
         // render safe points
@@ -360,7 +368,7 @@ export function SafeRouteMapView({
           // pin jemput primary
           const startEl = document.createElement("div")
           startEl.className = "w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl"
-          startEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="var(--color-primary)" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+          startEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ffa2cf" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
           const startMarker = new mapboxgl.Marker({ element: startEl })
             .setLngLat(startCoords)
@@ -369,7 +377,7 @@ export function SafeRouteMapView({
           // pin tujuan rose
           const endEl = document.createElement("div")
           endEl.className = "w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl"
-          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#db2777"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
 
           const endMarker = new mapboxgl.Marker({ element: endEl, anchor: "bottom" })
             .setLngLat(endCoords)
@@ -451,7 +459,7 @@ export function SafeRouteMapView({
             <div className="p-3.5 space-y-2">
               {/* titik jemput */}
               <div className="flex items-center gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0 shadow-2xs">
+                <div className="w-5 h-5 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0 shadow-2xs">
                   <ArrowUp className="w-3 h-3 stroke-[3]" />
                 </div>
                 <p className="text-sm font-semibold text-foreground truncate">
@@ -461,9 +469,9 @@ export function SafeRouteMapView({
 
               {/* titik tujuan */}
               <div className="flex items-center gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-[#db2777] flex items-center justify-center text-white shrink-0 shadow-2xs">
+                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white shrink-0 shadow-2xs">
                   <div className="w-2 h-2 rounded-full bg-white flex items-center justify-center">
-                    <div className="w-1 h-1 rounded-full bg-[#db2777]" />
+                    <div className="w-1 h-1 rounded-full bg-primary" />
                   </div>
                 </div>
                 <p className="text-sm font-semibold text-foreground truncate">
@@ -575,7 +583,7 @@ export function SafeRouteMapView({
           } ${sheetState === "minimized" ? "pointer-events-none pb-0" : "pb-2"}`}
         >
           {/* mode transportasi tabs */}
-          <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+          <div className="flex items-center justify-center gap-6 border-b border-border/60 pb-1">
             {TRAVEL_MODES.map((mode) => {
               const isSelected = (routeData?.travelMode || "walking") === mode.id
               return (
@@ -583,10 +591,10 @@ export function SafeRouteMapView({
                   key={mode.id}
                   type="button"
                   onClick={() => onModeChange && onModeChange(mode.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 pb-2 text-sm font-semibold transition-all bg-transparent ${
                     isSelected
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:bg-muted"
+                      ? "text-primary border-b-2 border-primary -mb-px"
+                      : "text-muted-foreground border-b-2 border-transparent -mb-px"
                   }`}
                 >
                   {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
@@ -599,26 +607,7 @@ export function SafeRouteMapView({
           </div>
 
           {isNavigating && activeRoute ? (
-            <div className="space-y-4">
-              <div className="bg-white border border-input rounded-2xl p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0">
-                    <ArrowUp className="w-3 h-3 stroke-[3]" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {routeData?.origin?.label || "Stasiun Sudirman"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative w-5 h-5 rounded-full bg-[#db2777] shrink-0">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {routeData?.destination?.label || "Jl. Senopati No. 45"}
-                  </p>
-                </div>
-              </div>
-
+            <div className="space-y-3">
               <div className="bg-primary px-3 py-1.5 text-primary-foreground flex items-center justify-between text-xs font-semibold rounded-xl">
                 <span className="truncate">Ikuti rute menuju tujuan</span>
                 <span className="bg-background/20 text-primary-foreground border-transparent text-[11px] px-2 py-0.5 rounded-full">
@@ -649,7 +638,7 @@ export function SafeRouteMapView({
                       onClick={() => onSelectRoute(route.id)}
                       className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 relative select-none ${
                         isSelected
-                          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                          ? "border-primary bg-primary/[0.03] shadow-sm ring-1 ring-primary/20"
                           : "border-input bg-white hover:bg-muted/30"
                       }`}
                     >
@@ -780,4 +769,51 @@ export function SafeRouteMapView({
       </div>
     </div>
   )
+}
+
+// interpolasi titik-titik lingkaran sempurna berbasis piksel layar konstan
+function generateScreenSpaceDots(coordinates, map, pixelSpacing = 20) {
+  if (!coordinates || coordinates.length < 2 || !map || typeof map.project !== "function") {
+    return { type: "FeatureCollection", features: [] }
+  }
+
+  const features = []
+  let leftover = 0
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const c1 = coordinates[i]
+    const c2 = coordinates[i + 1]
+    const p1 = map.project(c1)
+    const p2 = map.project(c2)
+
+    const dx = p2.x - p1.x
+    const dy = p2.y - p1.y
+    const segPixelDist = Math.sqrt(dx * dx + dy * dy)
+
+    if (segPixelDist <= 0) continue
+
+    let dist = leftover > 0 ? leftover : 0
+    while (dist <= segPixelDist) {
+      const t = dist / segPixelDist
+      const x = p1.x + dx * t
+      const y = p1.y + dy * t
+      const unprojected = map.unproject([x, y])
+
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Point",
+          coordinates: [unprojected.lng, unprojected.lat],
+        },
+      })
+      dist += pixelSpacing
+    }
+    leftover = dist - segPixelDist
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  }
 }
