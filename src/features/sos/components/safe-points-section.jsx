@@ -17,7 +17,7 @@ export function SafePointsSection({ safePoints = [], userCoords = null }) {
   }
 
   return (
-    <Card className="rounded-3xl border border-border/60 bg-card lg:h-[calc(100vh-7.5rem)] lg:flex lg:flex-col">
+    <Card className="rounded-3xl border border-border/60 bg-white lg:h-[calc(100vh-7.5rem)] lg:flex lg:flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
         <div>
           <CardTitle className="text-sm sm:text-base font-bold text-foreground">
