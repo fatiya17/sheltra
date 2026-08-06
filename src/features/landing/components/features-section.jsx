@@ -39,7 +39,7 @@ export function FeaturesSection() {
     <section className="w-full py-16 md:py-24 bg-white">
       <div className="container px-4 md:px-10 lg:px-16 mx-auto space-y-8">
 
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+        <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">
           Fitur Utama
         </h2>
 
@@ -66,17 +66,18 @@ export function FeaturesSection() {
 
                 {/* kolom kanan: teks, deskripsi, & button */}
                 <div className="flex-1 space-y-1 sm:space-y-1.5 min-w-0">
-                  <h3 className="text-xs sm:text-sm md:text-base font-bold text-slate-900 leading-tight">
+                  <h3 className="text-sm sm:text-base font-semibold text-slate-900 leading-tight">
                     {item.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2">
+                  <p className="text-xs sm:text-sm text-black leading-relaxed line-clamp-2">
                     {item.description}
                   </p>
                   <div>
                     <Link href={item.link}>
                       <Button
+                        variant="default"
                         size="sm"
-                        className="bg-rose-600 hover:bg-rose-700 text-white rounded-md mt-1 text-xs sm:text-sm h-7 sm:h-8 px-2.5 sm:px-3"
+                        className="mt-1 text-xs sm:text-sm h-7 sm:h-8 px-2.5 sm:px-3"
                       >
                         {item.cta}
                       </Button>
