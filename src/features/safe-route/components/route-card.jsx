@@ -21,7 +21,7 @@ export function RouteCard({ route, isSelected, onSelect }) {
       onClick={onSelect}
       className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 relative select-none ${
         isSelected
-          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+          ? "border-primary bg-primary/[0.03] shadow-sm ring-1 ring-primary/20"
           : "border-input bg-white hover:bg-muted/30 text-card-foreground"
       }`}
     >
@@ -32,7 +32,7 @@ export function RouteCard({ route, isSelected, onSelect }) {
             <span className="font-semibold text-sm text-foreground flex items-center gap-1.5">
               <span
                 className="w-3 h-3 rounded-full shrink-0"
-                style={{ backgroundColor: route.color || "#ffa2cf" }}
+                style={{ backgroundColor: route.color || "#F02E65" }}
               />
               {route.title}
             </span>
