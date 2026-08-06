@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { format } from "date-fns"
 import { id } from "date-fns/locale"
-import { CalendarIcon, Clock, Send } from "lucide-react"
+import { CalendarIcon, Clock, Send, TriangleAlert } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -58,26 +59,27 @@ const reportSchema = z.object({
   description: z.string().optional(),
 })
 
-export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
-  const [evidence, setEvidence] = useState(null)
+export function ReportForm({ onSubmitSuccess, onOfflineSaved, defaultCategory = "", draftData = null }) {
+  const [evidence, setEvidence] = useState(draftData?.evidence || null)
   const toast = useToast()
+  const router = useRouter()
 
   const form = useForm({
     resolver: zodResolver(reportSchema),
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: {
-      category: "",
-      location: "",
-      time: getInitialDateTimeISO(),
-      description: "",
+      category: draftData ? draftData.category : defaultCategory,
+      location: draftData ? draftData.location : "",
+      time: draftData ? draftData.time : getInitialDateTimeISO(),
+      description: draftData ? draftData.description : "",
     },
   })
 
   // handler submit form
   const onSubmit = async (values) => {
     const newReport = {
-      id: `rep-${Date.now()}`,
+      id: draftData ? draftData.id : `rep-${Date.now()}`,
       category: values.category,
       location: values.location,
       time: values.time || new Date().toISOString().slice(0, 16),
@@ -93,20 +95,13 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
       if (onOfflineSaved) {
         onOfflineSaved(newReport)
       }
-      toast({
-        title: "You are offline",
-        body: "Laporan anda akan dikirim otomatis ketika online",
-        type: "offline",
-        bg: "#0A1317",
-        duration: 5000,
-      })
     } else {
       // kondisi online normal
       onSubmitSuccess(newReport)
     }
 
     form.reset({
-      category: "",
+      category: defaultCategory,
       location: "",
       time: getInitialDateTimeISO(),
       description: "",
@@ -115,18 +110,9 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
   }
 
   return (
-    <Card className="p-4 md:p-6">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-xl font-bold font-heading">
-          Form Pelaporan Insiden Anonim
-        </CardTitle>
-        <CardDescription>
-          Laporkan pengalaman atau potensi bahaya di ruang publik untuk membantu menjaga keamanan sesama pengguna.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <div className="w-full">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-6">
             {/* field kategori */}
             <FormField
               control={form.control}
@@ -168,19 +154,22 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
             <FormField
               control={form.control}
               name="location"
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <FormItem className="space-y-2">
-                  <LocationPicker
-                    value={field.value}
-                    onChange={(val) => {
-                      field.onChange(val)
-                      if (val && val.trim().length > 0) {
-                        form.clearErrors("location")
-                      }
-                    }}
-                    onAddressDetailsChange={null}
-                  />
-                  <FormMessage />
+                  <FormControl>
+                    <LocationPicker
+                      value={field.value}
+                      hasError={!!fieldState.error}
+                      errorMessage={fieldState.error?.message}
+                      onChange={(val) => {
+                        field.onChange(val)
+                        if (val && val.trim().length > 0) {
+                          form.clearErrors("location")
+                        }
+                      }}
+                      onAddressDetailsChange={null}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />
@@ -207,14 +196,14 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
                 return (
                   <FormItem className="space-y-2 flex flex-col">
                     <FormLabel>Waktu Kejadian</FormLabel>
-                    <div className="flex gap-3 w-full flex-wrap sm:flex-nowrap">
+                    <div className="flex gap-3 w-full">
                       {/* popover pemilih tanggal */}
                       <Popover>
                         <FormControl>
                           <PopoverTrigger
                             render={
                               <Button
-                                variant="outline"
+                                variant="secondary"
                                 className={`flex-1 justify-start text-left font-normal focus:border-primary focus:ring-primary ${!field.value ? "text-muted-foreground" : ""}`}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -241,7 +230,7 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
                       </Popover>
 
                       {/* time picker 2 kolom jam dan menit */}
-                      <div className="w-full sm:w-36">
+                      <div className="w-1/3 sm:w-36 shrink-0">
                         <FormControl>
                           <TimePicker
                             value={timeValue}
@@ -280,17 +269,18 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved }) {
             />
 
             {/* upload bukti */}
-            <EvidenceUpload evidence={evidence} onEvidenceChange={setEvidence} />
+            <div>
+              <EvidenceUpload evidence={evidence} onEvidenceChange={setEvidence} />
+            </div>
 
-            {/* tombol submit */}
-            <div className="pt-2 flex items-center justify-end">
-              <Button type="submit" variant="pill" size="pill" className="flex items-center gap-2">
-                <Send className="w-4 h-4" /> Kirim Laporan Anonim
+            <div className="pt-4 mt-auto">
+              <Button type="submit" variant="primary" className="w-full h-12 text-base rounded-xl">
+                Kirim Laporan Anonim
               </Button>
             </div>
           </form>
         </Form>
-      </CardContent>
-    </Card>
+
+    </div>
   )
 }
