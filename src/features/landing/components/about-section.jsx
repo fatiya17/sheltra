@@ -5,24 +5,25 @@ import { ArrowRight } from "lucide-react";
 
 export function AboutSection() {
   return (
-    <section className="w-full py-8 md:py-20 bg-rose-600 text-white overflow-hidden">
+    <section className="w-full py-8 md:py-20 bg-primary text-primary-foreground overflow-hidden">
       <div className="container px-4 md:px-10 lg:px-16 mx-auto">
         <div className="grid gap-4 sm:gap-10 grid-cols-2 items-center">
 
           {/* kolom kiri: teks */}
           <div className="space-y-3 sm:space-y-5">
-            <h2 className="text-lg sm:text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-xl sm:text-2xl md:text-4xl font-semibold tracking-tight">
               Tentang Sheltra
             </h2>
 
-            <p className="text-rose-50 text-[10px] sm:text-base md:text-lg leading-relaxed max-w-xl">
+            <p className="text-primary-foreground/90 text-xs sm:text-base md:text-lg leading-relaxed max-w-xl">
               Sheltra adalah platform keselamatan perempuan yang membantu Anda bepergian dengan lebih aman melalui rekomendasi rute, pelaporan anonim, dan fitur darurat yang responsif.
             </p>
 
             <Link href="/about">
               <Button
+                variant="outline"
                 size="lg"
-                className="rounded-full bg-white text-rose-600 hover:bg-rose-50 font-semibold px-6 sm:px-10 py-2 sm:py-3 shadow-md text-xs sm:text-base h-auto"
+                className="bg-white text-primary border-primary hover:bg-slate-100 font-semibold px-6 sm:px-10 py-2 sm:py-3 shadow-md text-xs sm:text-base h-auto"
               >
                 Selengkapnya
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
