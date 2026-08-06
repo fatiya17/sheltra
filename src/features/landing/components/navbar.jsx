@@ -56,7 +56,7 @@ export function Navbar() {
         {/* tombol aksi */}
         <div className="flex items-center gap-4">
           <Link
-            href="/login"
+            href="/sign-in"
             className="hidden md:flex bg-rose-600 text-white font-semibold px-5 py-2.5 rounded-full hover:bg-rose-700 transition items-center gap-2 text-sm"
           >
             Masuk
@@ -90,7 +90,7 @@ export function Navbar() {
 
           <div className="pt-4 border-t border-gray-100">
             <Link
-              href="/login"
+              href="/sign-in"
               className="bg-rose-600 text-white font-semibold px-5 py-3 rounded-full flex items-center justify-center text-sm w-full hover:bg-rose-700 transition"
               onClick={() => setIsMobileMenuOpen(false)}
             >
