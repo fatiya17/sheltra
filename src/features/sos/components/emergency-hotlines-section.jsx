@@ -43,7 +43,7 @@ export function EmergencyHotlinesSection({ onShareLocation, onContactFirst, onSi
   }
 
   return (
-    <div className="bg-card border border-border/60 rounded-3xl px-5 py-5 space-y-5">
+    <div className="bg-white border border-border/60 rounded-3xl px-5 py-5 space-y-5">
       {/* judul & subjudul */}
       <div className="text-center">
         <h2 className="text-base font-bold text-foreground">Butuh bantuan cepat?</h2>
