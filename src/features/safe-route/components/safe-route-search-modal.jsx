@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
   X,
   ArrowUp,
@@ -40,13 +40,13 @@ export function SafeRouteSearchModal({
 
   // --- State Declarations ---
   const [originText, setOriginText] = useState(
-    initialOrigin?.label || initialOrigin || "Stasiun Sudirman, Menteng, Jakarta Pusat"
+    initialOrigin?.label || "Stasiun Sudirman, Menteng, Jakarta Pusat"
   )
   const [originCoords, setOriginCoords] = useState(
     initialOrigin?.coordinates || [106.8236, -6.2023]
   )
   const [destinationText, setDestinationText] = useState(
-    initialDestination?.label || initialDestination || "Jl. Senopati No. 45, Kebayoran Baru"
+    initialDestination?.label || "Jl. Senopati No. 45, Kebayoran Baru"
   )
   const [destinationCoords, setDestinationCoords] = useState(
     initialDestination?.coordinates || [106.8105, -6.2307]
@@ -54,6 +54,21 @@ export function SafeRouteSearchModal({
   const [departureTime, setDepartureTime] = useState(initialTime)
   const [travelMode, setTravelMode] = useState(initialMode)
   const [isDetectingGps, setIsDetectingGps] = useState(false)
+
+  // Sync inputs to the latest parent values only when the modal opens,
+  // so the modal matches the desktop/mobile map state (and never [object Object]).
+  const prevOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !prevOpenRef.current) {
+      setOriginText(initialOrigin?.label || "Stasiun Sudirman, Menteng, Jakarta Pusat")
+      setOriginCoords(initialOrigin?.coordinates || [106.8236, -6.2023])
+      setDestinationText(initialDestination?.label || "Jl. Senopati No. 45, Kebayoran Baru")
+      setDestinationCoords(initialDestination?.coordinates || [106.8105, -6.2307])
+      setDepartureTime(initialTime)
+      setTravelMode(initialMode)
+    }
+    prevOpenRef.current = isOpen
+  }, [isOpen, initialOrigin, initialDestination, initialTime, initialMode])
 
   // --- Handlers ---
   const handleOriginTextChange = useCallback((val) => {
@@ -135,10 +150,10 @@ export function SafeRouteSearchModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       {/* card modal responsif */}
-      <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg bg-background sm:rounded-3xl sm:border sm:border-input shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg bg-white sm:rounded-3xl sm:border sm:border-input shadow-2xl overflow-hidden flex flex-col">
         
         {/* top navigation bar */}
-        <div className="p-4 flex items-center justify-between border-b border-border/60 bg-background/95 backdrop-blur-md sticky top-0 z-10">
+        <div className="p-4 flex items-center justify-between border-b border-border/60 bg-white/95 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -158,7 +173,7 @@ export function SafeRouteSearchModal({
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
           {/* input card pencarian database asli */}
-          <div className="bg-card border border-input rounded-3xl p-3.5 shadow-sm space-y-2">
+          <div className="bg-white border border-input rounded-3xl p-3.5 shadow-sm space-y-2">
             
             {/* titik jemput / origin */}
             <PlaceSearchInput
@@ -205,7 +220,7 @@ export function SafeRouteSearchModal({
               type="button"
               onClick={handleUseCurrentLocation}
               disabled={isDetectingGps}
-              className="flex items-center gap-1.5 h-[30px] px-3 rounded-full border border-input bg-card hover:bg-muted text-xs font-semibold text-foreground shadow-2xs transition-all"
+              className="flex items-center gap-1.5 h-[30px] px-3 rounded-full border border-input bg-white hover:bg-muted text-xs font-semibold text-foreground shadow-2xs transition-all"
             >
               {isDetectingGps ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -220,7 +235,7 @@ export function SafeRouteSearchModal({
               value={departureTime}
               onChange={setDepartureTime}
               showSuffix={false}
-              triggerClassName="h-[30px] px-3 rounded-full border border-input bg-card text-xs font-semibold text-foreground shadow-2xs gap-1.5 hover:bg-muted/30 w-auto"
+              triggerClassName="h-[30px] px-3 rounded-full border border-input bg-white text-xs font-semibold text-foreground shadow-2xs gap-1.5 hover:bg-muted/30 w-auto"
             />
 
             {/* pilihan mode perjalanan */}
@@ -256,7 +271,7 @@ export function SafeRouteSearchModal({
                   key={bm.id}
                   type="button"
                   onClick={() => handleLocationPresetSelect(bm.address, bm.coordinates)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-input bg-card hover:bg-muted text-sm font-semibold text-foreground whitespace-nowrap shadow-2xs transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-input bg-white hover:bg-muted text-sm font-semibold text-foreground whitespace-nowrap shadow-2xs transition-all"
                 >
                   <Bookmark className="w-3 h-3 text-muted-foreground fill-muted-foreground/30" />
                   <span>{bm.name}</span>
@@ -293,7 +308,7 @@ export function SafeRouteSearchModal({
         </div>
 
         {/* bottom action button */}
-        <div className="p-4 border-t border-border/60 bg-background/95 backdrop-blur-md sticky bottom-0">
+        <div className="p-4 border-t border-border/60 bg-white/95 backdrop-blur-md sticky bottom-0">
           <button
             type="button"
             onClick={handleSubmit}
