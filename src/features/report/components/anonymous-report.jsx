@@ -1,14 +1,16 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { ReportForm } from "./report-form"
 import { MobileHeader } from "@/components/ui/mobile-header"
 import { OfflineIcon } from "@/components/ui/offline-icon"
 import { ChevronRight, Check } from "lucide-react"
 import Link from "next/link"
+import { offlineReportService } from "../services/offline-report.service"
 
 const MAIN_CATEGORIES = [
   { id: "Catcalling / Pelecehan Verbal", label: "Catcalling" },
@@ -21,6 +23,25 @@ export default function AnonymousReport() {
   const [step, setStep] = useState("category") // "category" | "form"
   const [selectedCategory, setSelectedCategory] = useState("")
   const [customCategory, setCustomCategory] = useState("")
+  const [showDraftPopup, setShowDraftPopup] = useState(false)
+
+  useEffect(() => {
+    const checkDrafts = async () => {
+      if (offlineReportService.isOnline()) {
+        const drafts = await offlineReportService.getPendingReports()
+        if (drafts.length > 0) {
+          setShowDraftPopup(true)
+        }
+      }
+    }
+    checkDrafts()
+    
+    const handleOnline = () => {
+      checkDrafts()
+    }
+    window.addEventListener("online", handleOnline)
+    return () => window.removeEventListener("online", handleOnline)
+  }, [])
   // handler submit berhasil
   const handleSubmitSuccess = () => {
     setStep("success")
@@ -189,6 +210,23 @@ export default function AnonymousReport() {
           </div>
         </div>
       )}
+
+      {/* Draft Popup */}
+      <Dialog open={showDraftPopup} onOpenChange={setShowDraftPopup}>
+        <DialogContent className="w-[90%] max-w-sm p-6 rounded-3xl bg-white border-none flex flex-col items-center text-center">
+          <img src="/draft.svg" alt="Draft" className="w-20 h-20 object-contain mb-2" />
+          <h2 className="text-[20px] font-bold text-slate-900 mb-2">Ada Laporan Tertunda</h2>
+          <p className="text-[14px] text-slate-600 mb-6 leading-relaxed">Kamu memiliki draf laporan yang belum terkirim. Ingin mengirimnya sekarang?</p>
+          <div className="flex w-full gap-3">
+            <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setShowDraftPopup(false)}>
+              Nanti Saja
+            </Button>
+            <Button variant="primary" className="flex-1 rounded-xl h-11" asChild>
+              <Link href="/anonymous-report/drafts">Lihat Draf</Link>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
