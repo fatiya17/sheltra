@@ -76,17 +76,17 @@ export function TimePicker({
           <Button
             id={id}
             type="button"
-            variant="outline"
+            variant="secondary"
             disabled={disabled}
             className={cn(
-              "w-full justify-start text-left font-normal h-9 px-3 gap-2",
+              "w-full justify-start text-left font-normal gap-2",
               open && "bg-primary text-primary-foreground border-primary",
               !value && "text-muted-foreground",
               triggerClassName || className
             )}
           >
             <Clock className="h-3.5 w-3.5 text-current opacity-70 shrink-0" />
-            <span className="font-semibold text-xs">{displayTime}</span>
+            <span className="font-semibold text-sm">{displayTime}</span>
           </Button>
         }
       />
@@ -112,7 +112,7 @@ export function TimePicker({
                     "size-9 rounded-md text-sm transition-colors flex items-center justify-center shrink-0 select-none",
                     isSelected
                       ? "bg-primary text-primary-foreground font-semibold shadow-xs ring-1 ring-primary/50"
-                      : "text-foreground hover:bg-muted font-normal"
+                      : "text-foreground hover:bg-primary/90 hover:text-white font-normal"
                   )}
                 >
                   {h}
@@ -138,7 +138,7 @@ export function TimePicker({
                     "size-9 rounded-md text-sm transition-colors flex items-center justify-center shrink-0 select-none",
                     isSelected
                       ? "bg-primary text-primary-foreground font-semibold shadow-xs ring-1 ring-primary/50"
-                      : "text-foreground hover:bg-muted font-normal"
+                      : "text-foreground hover:bg-primary/90 hover:text-white font-normal"
                   )}
                 >
                   {m}
