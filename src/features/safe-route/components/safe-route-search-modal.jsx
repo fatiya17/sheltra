@@ -182,7 +182,7 @@ export function SafeRouteSearchModal({
               onSelectPlace={handleOriginSelect}
               placeholder="Cari lokasi jemput / titik awal..."
               icon={
-                <div className="w-6 h-6 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0 shadow-xs">
+                <div className="w-6 h-6 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0 shadow-xs">
                   <ArrowUp className="w-3.5 h-3.5 stroke-[3]" />
                 </div>
               }
@@ -205,7 +205,7 @@ export function SafeRouteSearchModal({
               onSelectPlace={handleDestinationSelect}
               placeholder="Cari lokasi tujuan..."
               icon={
-                <div className="relative w-6 h-6 rounded-full bg-[#db2777] shrink-0 shadow-2xs">
+                <div className="relative w-6 h-6 rounded-full bg-primary shrink-0 shadow-2xs">
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
                 </div>
               }
@@ -239,7 +239,7 @@ export function SafeRouteSearchModal({
             />
 
             {/* pilihan mode perjalanan */}
-            <div className="flex items-center h-[30px] bg-muted/60 p-0.5 rounded-full border border-input">
+            <div className="flex items-center h-[30px] p-0.5 gap-1">
               {TRAVEL_MODES.map((mode) => {
                 const isSelected = travelMode === mode.id
                 return (
@@ -247,10 +247,10 @@ export function SafeRouteSearchModal({
                     key={mode.id}
                     type="button"
                     onClick={() => setTravelMode(mode.id)}
-                    className={`h-full px-2 rounded-full transition-all flex items-center justify-center ${
+                    className={`h-full px-2 transition-all flex items-center justify-center bg-transparent ${
                       isSelected
-                        ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                        : "text-muted-foreground hover:bg-muted"
+                        ? "text-primary border-b-2 border-primary font-semibold"
+                        : "text-muted-foreground border-b-2 border-transparent"
                     }`}
                     title={mode.label}
                   >
