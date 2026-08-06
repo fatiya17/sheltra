@@ -180,7 +180,7 @@ function DialogFooter({ className, showCloseButton = false, children, ...props }
     >
       {children}
       {showCloseButton && (
-        <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <Button variant="secondary" onClick={() => onOpenChange(false)}>
           Close
         </Button>
       )}
