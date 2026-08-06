@@ -928,7 +928,7 @@ export function SosActiveView({
             <p className="text-sm font-semibold text-[#C00D53]">
               {trustedContacts.length} Trusted Contact diberi tahu
             </p>
-            <p className="text-sm text-[#C00D53] mt-0.5">
+            <p className="text-xs text-[#C00D53] mt-0.5">
               Lokasi & waktu diberikan otomatis
             </p>
           </div>
