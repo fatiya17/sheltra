@@ -1,162 +1,214 @@
-"use client"
+"use client";
 
-import React from "react"
-import {
-  X,
-  MapPin,
-  Clock,
-  ShieldCheck,
-  AlertTriangle,
-  Users,
-  Eye,
-  CheckCircle2,
-  ExternalLink,
-} from "lucide-react"
-import { RISK_LEVELS } from "../constants/heatmap.constants"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import React from "react";
+import { X, MapPin } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-export function IncidentDetailDrawer({ incident, isOpen, onClose, onOpenReport }) {
-  if (!isOpen || !incident) return null
+const getRiskData = (score) => {
+  if (score >= 75) {
+    return {
+      label: "Risiko Tinggi",
+      text: "text-red-500",
+      dot: "bg-red-500",
+      variant: "destructive",
+    };
+  }
 
-  const riskMeta = RISK_LEVELS[incident.riskLevel.toUpperCase()] || RISK_LEVELS.LOW
+  if (score >= 40) {
+    return {
+      label: "Risiko Sedang",
+      text: "text-amber-500",
+      dot: "bg-amber-500",
+      variant: "warning",
+    };
+  }
+
+  return {
+    label: "Risiko Rendah",
+    text: "text-green-500",
+    dot: "bg-green-500",
+    variant: "success",
+  };
+};
+
+export function IncidentDetailDrawer({
+  incident,
+  isOpen,
+  onClose,
+  onOpenReport,
+}) {
+  if (!isOpen || !incident) return null;
+
+  const riskScore = incident.riskScore ?? 85;
+  const risk = getRiskData(riskScore);
+  const reports = incident.totalReports ?? 12;
+  const location = incident.location || "Jl. Margonda Raya Dekat Kober";
+  const dangerousTime = incident.timeOfDay || "18.00 - 22.00";
+  const nearestSafePoint = incident.safePoint || "Pos Polisi Margonda";
+  const nearestDistance = incident.safeDistance || "450 m";
+
+  const incidentTypes = incident.incidentTypes || [
+    { name: "Catcalling", total: 7, color: "#ec4899" },
+    { name: "Dikuntit", total: 3, color: "#f59e0b" },
+    { name: "Kontak Fisik", total: 2, color: "#7c3aed" },
+  ];
+
+  const maxValue = Math.max(...incidentTypes.map((i) => i.total));
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-      {/* card dialog detail insiden */}
+    <div
+      className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-sm flex justify-center items-end sm:items-center p-0 sm:p-4"
+      onClick={onClose}
+    >
       <div
-        className="w-full sm:max-w-lg bg-white sm:rounded-3xl rounded-t-3xl border border-input shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-white rounded-t-[24px] sm:rounded-2xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-8 duration-300 flex flex-col max-h-[90vh]"
       >
-        {/* header modal */}
-        <div className="p-4 flex items-center justify-between border-b border-border/60 bg-background/95 sticky top-0 z-10">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span
-              className="w-3 h-3 rounded-full shrink-0 animate-pulse shadow-xs"
-              style={{ backgroundColor: riskMeta.color }}
-            />
-            <div className="min-w-0">
-              <h3 className="text-base font-bold font-heading text-foreground truncate">
-                {incident.title}
-              </h3>
-              <p className="text-xs text-muted-foreground truncate">{incident.areaName}</p>
-            </div>
-          </div>
+        {/* Mobile Handle */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-gray-200" />
+        </div>
 
+        {/* Header */}
+        <div className="flex justify-between items-center px-5 py-3.5 border-b border-gray-100">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">
+              Detail Area & Risiko
+            </h2>
+            <p className="text-[11px] text-gray-400">
+              Analisis historis laporan masyarakat
+            </p>
+          </div>
           <button
-            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-foreground transition-colors shrink-0"
+            className="w-7 h-7 rounded-full bg-gray-50 hover:bg-gray-100 transition flex items-center justify-center text-gray-500"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* konten detail */}
+        {/* Scrollable Content */}
         <div className="p-5 overflow-y-auto space-y-4">
-          {/* status dan badge risiko */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${riskMeta.badgeBg} ${riskMeta.textColor} ${riskMeta.badgeBorder}`}
-            >
-              Tingkat Risiko: {riskMeta.label}
-            </span>
+          {/* TOP SECTION */}
+          <div className="space-y-2">
+            <div className="font-semibold text-sm text-gray-900">
+              {location}
+            </div>
 
-            <Badge variant="outline" className="text-xs font-semibold py-1">
-              {incident.category}
-            </Badge>
+            {/* Risiko kiri - Badge kanan */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className={`w-2.5 h-2.5 rounded-full ${risk.dot}`} />
+                <span className={risk.text}>{risk.label}</span>
+              </div>
 
-            <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              {incident.moderationStatus}
-            </span>
+              <Badge
+                variant={risk.variant}
+                className="font-semibold px-2.5 py-0.5 text-xs shrink-0"
+              >
+                Skor Risiko: {riskScore}/100
+              </Badge>
+            </div>
+
+            {/* Laporan */}
+            <div className="text-xs text-gray-500">
+              {reports} Laporan (7 hari terakhir)
+            </div>
           </div>
 
-          {/* info lokasi & waktu */}
-          <div className="bg-muted/40 border border-border/60 rounded-2xl p-3.5 space-y-2 text-xs">
-            <div className="flex items-start gap-2 text-foreground">
-              <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-              <span className="font-medium">{incident.location}</span>
-            </div>
+          <hr className="border-gray-100 my-4" />
 
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                Waktu Kejadian: <strong className="text-foreground">{incident.timeOfDay}</strong>
-              </span>
-            </div>
+          {/* JENIS KEJADIAN */}
+          <section>
+            <h3 className="text-xs font-bold text-gray-800 mb-3">
+              Jenis Kejadian
+            </h3>
 
-            {incident.incidentCount > 0 && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>
-                  Akumulasi Riwayat: <strong className="text-foreground">{incident.incidentCount} laporan</strong> di area sekitar
+            <div className="space-y-2.5">
+              {incidentTypes.map((item) => {
+                const width = (item.total / maxValue) * 100;
+
+                return (
+                  <div
+                    key={item.name}
+                    className="grid grid-cols-[110px_1fr_25px] items-center gap-3 text-xs"
+                  >
+                    <span className="text-gray-600 font-medium">
+                      {item.name}
+                    </span>
+
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${width}%`,
+                          backgroundColor: item.color,
+                        }}
+                      />
+                    </div>
+
+                    <span className="text-gray-600 font-semibold text-right">
+                      {item.total}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <hr className="border-gray-100 my-4" />
+
+          {/* JAM RAWAN */}
+          <section className="flex justify-between items-center text-xs">
+            <span className="font-bold text-gray-700">Jam Rawan</span>
+            <span className="font-semibold text-gray-900">{dangerousTime}</span>
+          </section>
+
+          <hr className="border-gray-100 my-4" />
+
+          {/* TITIK AMAN TERDEKAT */}
+          <section className="space-y-2 text-xs">
+            <h3 className="font-bold text-gray-700">Titik Aman Terdekat</h3>
+
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="font-semibold text-gray-800">
+                  {nearestSafePoint}
                 </span>
               </div>
-            )}
-          </div>
 
-          {/* deskripsi kronologi */}
-          <div className="space-y-1.5">
-            <h4 className="text-xs font-semibold text-foreground">Rincian Laporan:</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed bg-white p-3 rounded-xl border border-input/60">
-              {incident.description}
-            </p>
-          </div>
-
-          {/* lampiran bukti jika ada */}
-          {incident.evidenceImage && (
-            <div className="space-y-1.5">
-              <h4 className="text-xs font-semibold text-foreground">Lampiran Bukti Foto:</h4>
-              <div className="relative rounded-2xl overflow-hidden border border-input aspect-video bg-muted group">
-                <img
-                  src={incident.evidenceImage}
-                  alt="Bukti Kejadian"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent flex items-end p-2.5">
-                  <span className="text-[10px] text-white/90 font-medium">
-                    Terverifikasi oleh Tim Moderasi
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* konfirmasi komunitas */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs">
-            <div className="flex items-center gap-2 text-foreground">
-              <Users className="w-4 h-4 text-primary shrink-0" />
-              <span>
-                Dikonfirmasi oleh <strong className="text-primary">{incident.verifiedCount || 12}</strong> warga sekitar
+              <span className="font-bold text-emerald-600">
+                {nearestDistance}
               </span>
             </div>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-          </div>
+          </section>
         </div>
 
-        {/* footer modal */}
-        <div className="p-4 border-t border-border/60 bg-background/95 flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1 text-xs rounded-xl"
-            onClick={onClose}
-          >
-            Tutup
-          </Button>
+        {/* FOOTER */}
+        <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-3">
+          <div className="flex gap-2.5">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-gray-700 hover:bg-gray-50 text-xs transition"
+            >
+              Tutup
+            </button>
 
-          <Button
-            variant="pill"
-            className="flex-1 text-xs"
-            onClick={() => {
-              onClose()
-              if (onOpenReport) onOpenReport()
-            }}
-          >
-            Laporkan Update
-          </Button>
+            <button
+              onClick={() => {
+                onClose();
+                if (onOpenReport) {
+                  onOpenReport();
+                }
+              }}
+              className="flex-1 py-2.5 rounded-xl bg-[#e8195a] text-white font-bold hover:bg-[#cf0f4f] text-xs transition shadow-sm"
+            >
+              Lapor Insiden
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
