@@ -70,7 +70,7 @@ export function SafeCommuteHome({
       {/* konten utama bertumpuk */}
       <div className="max-w-lg w-full mx-auto px-4 -mt-8 relative z-20 space-y-4">
         {/* card search bar & bookmark */}
-        <div className="bg-card border border-input rounded-3xl p-4 shadow-xl space-y-3.5">
+        <div className="bg-white border border-input rounded-3xl p-4 shadow-xl space-y-3.5">
           {/* mini peta ilustrasi */}
           <div
             onClick={onOpenSearch}
@@ -131,7 +131,7 @@ export function SafeCommuteHome({
         </div>
 
         {/* section riwayat tujuan */}
-        <div className="bg-card border border-input rounded-3xl p-4 shadow-sm space-y-3">
+        <div className="bg-white border border-input rounded-3xl p-4 shadow-sm space-y-3">
 
           {/* onetap highlight card */}
           <div
