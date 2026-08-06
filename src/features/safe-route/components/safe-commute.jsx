@@ -28,7 +28,7 @@ import {
   CarTaxiFront,
 } from "lucide-react"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import { faLightbulb, faRoute, faChartSimple, faMapPin } from "@fortawesome/free-solid-svg-icons"
+import { faLightbulb, faRoute, faChartSimple, faMapPin, faLocationDot } from "@fortawesome/free-solid-svg-icons"
 import {
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
@@ -48,6 +48,48 @@ import { TimePicker } from "@/components/ui/time-picker"
 import { useToast } from "@/components/ui/toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import "mapbox-gl/dist/mapbox-gl.css"
+
+const RouteMiniMap = ({ coordinates, riskLabel }) => {
+  const containerRef = useRef(null)
+  
+  useEffect(() => {
+    if (!containerRef.current || !coordinates || coordinates.length < 2) return
+    let map = null
+    import("mapbox-gl").then((mod) => {
+      const mapboxgl = mod.default
+      mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
+      try {
+        map = new mapboxgl.Map({
+          container: containerRef.current,
+          style: "mapbox://styles/mapbox/streets-v12",
+          interactive: false,
+          attributionControl: false,
+        })
+        map.on("load", () => {
+          const bounds = new mapboxgl.LngLatBounds()
+          coordinates.forEach((c) => bounds.extend(c))
+          map.fitBounds(bounds, { padding: 20, duration: 0 })
+          
+          const color = riskLabel === "Risiko Rendah" ? "#16a34a" : riskLabel === "Risiko Sedang" ? "#d97706" : "#dc2626"
+          
+          map.addSource("route", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } } })
+          map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": color, "line-width": 5, "line-dasharray": [0, 1.8] } })
+          
+          const startEl = document.createElement("div")
+          startEl.innerHTML = `<svg viewBox="0 0 38 48" width="24" height="30" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ffa2cf" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+          new mapboxgl.Marker({ element: startEl, anchor: "bottom" }).setLngLat(coordinates[0]).addTo(map)
+          
+          const endEl = document.createElement("div")
+          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="24" height="30" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+          new mapboxgl.Marker({ element: endEl, anchor: "bottom" }).setLngLat(coordinates[coordinates.length - 1]).addTo(map)
+        })
+      } catch (err) {}
+    })
+    return () => { if (map) map.remove() }
+  }, [coordinates, riskLabel])
+  
+  return <div ref={containerRef} className="w-full h-full pointer-events-none" />
+}
 
 export default function SafeCommute() {
   const router = useRouter()
@@ -377,7 +419,7 @@ export default function SafeCommute() {
           const bounds = new mapboxgl.LngLatBounds()
           activeRoute.coordinates.forEach((c) => bounds.extend(c))
           const isDesktop = window.innerWidth >= 768
-          map.fitBounds(bounds, { padding: isDesktop ? { top: 140, bottom: 140, left: 540, right: 140 } : { top: 220, bottom: 260, left: 60, right: 60 }, duration: 1000 })
+          map.fitBounds(bounds, { padding: isDesktop ? { top: 140, bottom: 140, left: 540, right: 140 } : { top: 200, bottom: 350, left: 40, right: 40 }, duration: 1000 })
         }
       }
       if (map.isStyleLoaded()) render(); else map.once("load", render)
@@ -520,7 +562,7 @@ export default function SafeCommute() {
   const mockRecommendationRoutes = [
     {
       id: "rec-route-1",
-      label: "Rute 1",
+      label: "Rute Teraman",
       recommended: true,
       riskLabel: "Risiko Rendah",
       riskColor: "#16a34a",
@@ -528,10 +570,11 @@ export default function SafeCommute() {
       duration: "16 Menit",
       safePoints: "7 titik aman",
       distance: "5 KM",
+      coordinates: [[106.822, -6.200], [106.825, -6.205], [106.830, -6.210]],
     },
     {
       id: "rec-route-2",
-      label: "Rute 2",
+      label: "Rute Tercepat",
       recommended: false,
       riskLabel: "Risiko Sedang",
       riskColor: "#d97706",
@@ -539,10 +582,11 @@ export default function SafeCommute() {
       duration: "10 Menit",
       safePoints: "5 titik aman",
       distance: "3 KM",
+      coordinates: [[106.822, -6.200], [106.828, -6.202], [106.830, -6.210]],
     },
     {
       id: "rec-route-3",
-      label: "Rute 3",
+      label: "Jalan Alternatif",
       recommended: false,
       riskLabel: "Risiko Tinggi",
       riskColor: "#dc2626",
@@ -550,6 +594,7 @@ export default function SafeCommute() {
       duration: "12 Menit",
       safePoints: "2 titik aman",
       distance: "4 KM",
+      coordinates: [[106.822, -6.200], [106.824, -6.208], [106.830, -6.210]],
     },
   ]
 
@@ -557,7 +602,7 @@ export default function SafeCommute() {
   const recommendationRoutes = routes.length >= 2
     ? routes.slice(0, 3).map((r, i) => ({
         id: r.id,
-        label: `Rute ${i + 1}`,
+        label: i === 0 ? "Rute Teraman" : i === 1 ? "Rute Tercepat" : "Jalan Alternatif",
         recommended: i === 0,
         riskLabel: r.riskLevel === "Rendah" ? "Risiko Rendah" : r.riskLevel === "Sedang" ? "Risiko Sedang" : "Risiko Tinggi",
         riskColor: r.riskLevel === "Rendah" ? "#16a34a" : r.riskLevel === "Sedang" ? "#d97706" : "#dc2626",
@@ -565,6 +610,7 @@ export default function SafeCommute() {
         duration: r.duration,
         safePoints: `${r.safePointsCount} titik aman`,
         distance: r.distance,
+        coordinates: r.coordinates,
       }))
     : mockRecommendationRoutes
 
@@ -725,11 +771,11 @@ export default function SafeCommute() {
             {RECENT_DESTINATIONS.slice(0, 4).map((rec) => (
               <button key={rec.id} type="button" onClick={() => { setOriginText(rec.name); setOriginCoords(rec.coordinates) }} className="w-full px-2 py-3.5 flex items-center gap-3 hover:bg-pink-50/40 transition-colors text-left">
                 <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                  <FontAwesomeIcon icon={faMapPin} style={{ color: "#DFE5EE", width: "16px", height: "16px" }} />
+                  <FontAwesomeIcon icon={faLocationDot} style={{ color: "#DFE5EE", width: "24px", height: "24px" }} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-gray-800 truncate">{rec.name}</p>
-                  <p className="text-xs text-gray-400 truncate leading-snug">{rec.detail}</p>
+                  <p className="text-xs text-black truncate leading-snug">{rec.detail}</p>
                 </div>
               </button>
             ))}
@@ -743,7 +789,7 @@ export default function SafeCommute() {
             variant="primary"
             onClick={handleStartSearch}
             disabled={!destinationText.trim()}
-            className="w-full py-3.5 rounded-2xl font-bold text-base shadow-lg shadow-primary/25 transition-all"
+            className="w-full h-12 rounded-2xl font-bold text-base shadow-none transition-all"
           >
             Cari rute aman
           </Button>
@@ -802,7 +848,7 @@ export default function SafeCommute() {
 
         <div className="flex-1 flex flex-col items-center justify-start px-6 pt-6 gap-6">
           {/* map illustration — using asset */}
-          <div className="w-48 h-48 rounded-3xl bg-gray-50 border border-gray-100 flex items-center justify-center shadow-inner overflow-hidden relative mb-2">
+          <div className="w-48 h-48 flex items-center justify-center relative mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/load-image.svg" alt="Mencari rute aman" className="w-full h-full object-contain p-3" />
           </div>
@@ -909,7 +955,7 @@ export default function SafeCommute() {
               <div className="px-4 pt-4 pb-3 space-y-2">
                 {/* "Disarankan" badge — sits above title row */}
                 {route.recommended && (
-                  <Badge variant="green" className="text-[11px] font-bold px-2.5 gap-1.5 mb-1">
+                  <Badge variant="green" className="text-[11px] font-bold px-2.5 gap-1.5 mb-4">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-600 inline-block shrink-0" />
                     Disarankan
                   </Badge>
@@ -917,7 +963,7 @@ export default function SafeCommute() {
 
                 {/* title + risk badge on same row */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-base font-bold text-foreground">{route.label}</span>
+                  <span className="text-[13px] font-semibold text-primary">{route.label}</span>
                   <Badge
                     variant={route.riskLabel === "Risiko Rendah" ? "pink" : route.riskLabel === "Risiko Sedang" ? "yellow" : "red"}
                     className="text-[11px] font-semibold px-3 h-6 shrink-0"
@@ -945,23 +991,11 @@ export default function SafeCommute() {
 
               {/* mini map */}
               <div className="h-28 mx-4 mb-3 rounded-2xl overflow-hidden bg-muted/30 relative border border-border/60">
-                <svg viewBox="0 0 320 112" className="w-full h-full" preserveAspectRatio="xMidYMid slice" fill="none">
-                  <rect width="320" height="112" fill="#f0f4f8"/>
-                  <rect x="0" y="30" width="80" height="55" rx="4" fill="#e2e8f0"/>
-                  <rect x="100" y="10" width="60" height="40" rx="4" fill="#e2e8f0"/>
-                  <rect x="180" y="50" width="70" height="50" rx="4" fill="#e2e8f0"/>
-                  <rect x="260" y="20" width="55" height="45" rx="4" fill="#e2e8f0"/>
-                  <path
-                    d={idx === 0 ? "M 30 70 Q 100 30 190 55 T 290 40" : idx === 1 ? "M 30 80 Q 120 40 200 70 T 290 55" : "M 30 60 Q 90 90 160 60 T 290 70"}
-                    stroke={route.riskLabel === "Risiko Rendah" ? "#16a34a" : route.riskLabel === "Risiko Sedang" ? "#d97706" : "#dc2626"}
-                    strokeWidth="3.5" strokeLinecap="round" fill="none"
-                  />
-                  <circle cx="30" cy={idx === 0 ? 70 : idx === 1 ? 80 : 60} r="7" fill="#ffa2cf" stroke="white" strokeWidth="2.5"/>
-                  <svg x="278" y={idx === 0 ? 28 : idx === 1 ? 43 : 58} width="22" height="28" viewBox="0 0 38 48" fill="none">
-                    <path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48S38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="var(--color-primary)" stroke="#fff" strokeWidth="3"/>
-                    <circle cx="19" cy="19" r="6.5" fill="white"/>
-                  </svg>
-                </svg>
+                {route.coordinates ? (
+                  <RouteMiniMap coordinates={route.coordinates} riskLabel={route.riskLabel} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">Peta rute</div>
+                )}
               </div>
 
               {/* CTA */}
@@ -1171,7 +1205,7 @@ export default function SafeCommute() {
                 <p className="text-sm font-medium text-foreground truncate">{destinationText}</p>
               </div>
             </div>
-            <div className="bg-primary px-3 py-1.5 text-primary-foreground flex items-center justify-between text-xs font-semibold">
+            <div className="bg-primary px-3 py-1.5 text-primary-foreground flex items-center justify-between text-xs font-medium">
               <span className="truncate">{isBlankSpot ? "Data Keamanan Terbatas" : `Rute Teraman • ${activeRoute?.safePointsCount || 5} Safe Points`}</span>
               <Badge variant="outline" className="bg-background/20 text-primary-foreground border-transparent text-[11px]">{departureTime}</Badge>
             </div>
@@ -1253,12 +1287,12 @@ export default function SafeCommute() {
 
           {/* bottom action bar */}
           <div className="p-3 border-t border-border/60 bg-white shrink-0 flex items-center gap-2.5 shadow-lg">
-            <button type="button" onClick={handleStartNavigation} className="py-3 px-3.5 rounded-2xl border border-input bg-muted/40 hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs">
-              {isNavigating ? <><Square className="w-4 h-4 text-primary" /><span>Matikan</span></> : <><Navigation className="w-4 h-4 text-primary" /><span>Mulai Navigasi</span></>}
-            </button>
-            <button type="button" onClick={handleGoToProtectedTrip} className="flex-1 py-3 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all select-none">
-            <span>Protected Trip</span>
-            </button>
+            <Button type="button" variant="secondary" onClick={handleStartNavigation} className="flex-shrink-0 h-12 rounded-2xl" title={isNavigating ? "Matikan" : "Mulai Navigasi"}>
+              {isNavigating ? <><Square className="w-4 h-4 text-black" /><span>Matikan</span></> : <><Navigation className="w-4 h-4 text-black" /><span>Mulai Navigasi</span></>}
+            </Button>
+            <Button type="button" variant="primary" onClick={handleGoToProtectedTrip} className="flex-1 w-full shadow-none h-12 rounded-2xl" title="Protected Trip">
+              <span>Protected Trip</span>
+            </Button>
           </div>
         </div>
       </div>
