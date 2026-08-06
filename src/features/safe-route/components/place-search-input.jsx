@@ -205,7 +205,7 @@ export function PlaceSearchInput({
 
       {/* dropdown list hasil pencarian */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-2 bg-popover text-popover-foreground border border-input rounded-2xl shadow-2xl z-50 overflow-visible animate-in fade-in-50 zoom-in-95 duration-150">
+        <div className="absolute left-0 right-0 top-full mt-2 bg-white text-popover-foreground border border-input rounded-2xl shadow-2xl z-50 overflow-visible animate-in fade-in-50 zoom-in-95 duration-150">
           {/* list item suggestions */}
           <div className="divide-y divide-border/30">
             {isLoading ? (
