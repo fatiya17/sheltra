@@ -261,7 +261,7 @@ export const safeRouteService = {
                     "Jalur alternatif melalui jalan penghubung",
                     "Penerangan sedang di beberapa ruas jalan",
                   ],
-              color: isPrimary ? "#ffa2cf" : "#f59e0b",
+              color: isPrimary ? "#F02E65" : "#f59e0b",
               coordinates: r.geometry.coordinates,
               currentHourAdvice: timeMod.advice,
             }
