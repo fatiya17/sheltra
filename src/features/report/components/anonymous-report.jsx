@@ -1,76 +1,194 @@
 "use client"
 
 import React, { useState } from "react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { ReportForm } from "./report-form"
-import { ReportFeed } from "./report-feed"
-import { useOfflineReports } from "../hooks/use-offline-reports"
-import { INITIAL_REPORTS } from "../constants/report.constants"
+import { MobileHeader } from "@/components/ui/mobile-header"
+import { OfflineIcon } from "@/components/ui/offline-icon"
+import { ChevronRight, Check } from "lucide-react"
+import Link from "next/link"
+
+const MAIN_CATEGORIES = [
+  { id: "Catcalling / Pelecehan Verbal", label: "Catcalling" },
+  { id: "Pelecehan Fisik / Physical Harassment", label: "Kontak fisik" },
+  { id: "Dikuntit / Suspicious Following", label: "Dikuntit" },
+  { id: "Lainnya", label: "Lainnya" },
+]
 
 export default function AnonymousReport() {
-  const [reports, setReports] = useState(INITIAL_REPORTS)
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-
-  // sync laporan offline ke feed
-  const handleReportSynced = (syncedReport) => {
-    setReports((prev) => [syncedReport, ...prev])
+  const [step, setStep] = useState("category") // "category" | "form"
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [customCategory, setCustomCategory] = useState("")
+  // handler submit berhasil
+  const handleSubmitSuccess = () => {
+    setStep("success")
   }
 
-  const { refreshQueue } = useOfflineReports(handleReportSynced)
+  const handleOfflineSaved = () => {
+    setStep("offline")
+  }
 
-  // handler submit berhasil
-  const handleSubmitSuccess = (newReport) => {
-    setReports([newReport, ...reports])
-    setShowSuccessDialog(true)
+  const handleNext = () => {
+    if (selectedCategory) {
+      setStep("form")
+    }
   }
 
   return (
-    <div className="w-full p-4 md:px-8 md:py-6 space-y-6 md:space-y-8 relative">
-      {/* judul halaman */}
-      <h1 className="text-3xl font-bold font-heading text-foreground tracking-tight">
-        Anonymous Report
-      </h1>
-
-      {/* grid layout halaman */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* kolom form pelaporan */}
-        <div className="lg:col-span-5">
-          <ReportForm
-            onSubmitSuccess={handleSubmitSuccess}
-            onOfflineSaved={refreshQueue}
+    <div className="w-full flex flex-col min-h-screen bg-white md:max-w-2xl md:mx-auto">
+      {step === "category" && (
+        <>
+          <MobileHeader 
+            title="Lapor Insiden" 
+            onBack={() => window.history.back()} 
           />
-        </div>
+          <div className="flex-1 flex flex-col px-6 py-6">
+            <div className="w-full flex justify-center mb-6">
+              <img src="/assets/anon%20loading.png" alt="Map Illustration" className="w-full max-w-[260px] h-auto object-contain" />
+            </div>
+            
+            <div className="text-center mb-8">
+              <h2 className="text-[20px] font-semibold text-slate-900 leading-tight mb-3">
+                Laporkan Kejadian<br />dengan Aman
+              </h2>
+              <p className="text-base text-black px-4 leading-relaxed">
+                Setiap laporan membantu membuat lingkungan yang lebih aman untuk semua
+              </p>
+            </div>
 
-        {/* kolom feed laporan */}
-        <div className="lg:col-span-7 space-y-6">
-          <ReportFeed reports={reports} />
-        </div>
-      </div>
+            <div className="w-full flex-1 mb-8">
+              <h3 className="text-base font-semibold text-slate-900 mb-4">
+                Pilih Kategori Insiden
+              </h3>
+              <div className="space-y-3">
+                {MAIN_CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategory === cat.id
+                  return (
+                    <div key={cat.id} className="space-y-2">
+                      <label 
+                        className={`flex items-center gap-3 p-4 rounded-xl border ${isSelected ? 'border-primary bg-primary/5' : 'border-slate-200'} cursor-pointer transition-colors`}
+                      >
+                        <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center border transition-colors ${isSelected ? 'border-primary bg-primary/15' : 'border-[#F1F1F2] bg-[#F1F1F2]'}`}>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-primary" strokeWidth={3} />}
+                        </div>
+                        <input 
+                          type="radio" 
+                          name="category"
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={() => {
+                            setSelectedCategory(cat.id)
+                            if (cat.id !== "Lainnya") {
+                              setCustomCategory("")
+                            }
+                          }}
+                        />
+                        <span className="text-[15px] text-slate-800">{cat.label}</span>
+                      </label>
+                      {cat.id === "Lainnya" && isSelected && (
+                        <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <Input
+                            placeholder="Ketik kategori kejadian..."
+                            value={customCategory}
+                            onChange={(e) => setCustomCategory(e.target.value)}
+                            className="h-[56px] rounded-xl border-primary bg-primary/5 px-4 text-[15px] text-slate-800 placeholder:text-slate-400 focus-visible:ring-primary focus-visible:border-primary shadow-none"
+                            autoFocus
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
 
-      {/* dialog sukses submit */}
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-[380px] bg-card p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
-          <img src="/success.svg" alt="Success" className="w-32 h-32 object-contain" />
-          <div className="space-y-2">
-            <DialogTitle className="text-xl font-bold tracking-tight text-slate-800">
-              Laporan Terkirim
-            </DialogTitle>
-            <DialogDescription className="text-slate-600 text-sm px-2 leading-relaxed">
-              Terima kasih telah melaporkan, semoga kamu sudah aman ya.
-            </DialogDescription>
+            <div className="mt-auto">
+              <Button 
+                onClick={handleNext} 
+                disabled={!selectedCategory || (selectedCategory === "Lainnya" && !customCategory.trim())}
+                variant="primary" 
+                className="w-full h-12 text-base rounded-xl"
+              >
+                Lanjutkan
+              </Button>
+            </div>
           </div>
+        </>
+      )}
+      
+      {step === "form" && (
+        <>
+          <MobileHeader 
+            title="Lapor Insiden" 
+            onBack={() => setStep("category")} 
+          />
+          <div className="w-full flex justify-end px-6 pt-2">
+            <Link href="/anonymous-report/drafts" className="text-primary font-semibold text-sm flex items-center gap-1 hover:underline">
+              Draft Laporan <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="flex-1 px-4 py-4 md:px-8">
+            <ReportForm
+              defaultCategory={selectedCategory === "Lainnya" ? customCategory : selectedCategory}
+              onSubmitSuccess={handleSubmitSuccess}
+              onOfflineSaved={handleOfflineSaved}
+            />
+          </div>
+        </>
+      )}
 
+      {step === "success" && (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-6">
+          <img src="/success.svg" alt="Success" className="w-40 h-40 object-contain mb-4" />
+          <div className="space-y-3">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-800">
+              Laporan Terkirim
+            </h2>
+            <p className="text-slate-600 text-base px-2 leading-relaxed max-w-sm mx-auto">
+              Terima kasih telah melaporkan, semoga kamu sudah aman ya.
+            </p>
+          </div>
           <Button
-            onClick={() => setShowSuccessDialog(false)}
-            variant="pill"
-            size="pill"
-            className="w-full"
+            asChild
+            variant="primary"
+            className="w-full mt-8 max-w-sm h-12 text-base rounded-xl"
           >
-            Selesai
+            <Link href="/">Selesai</Link>
           </Button>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+      {step === "offline" && (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-6">
+          <OfflineIcon className="w-[120px] h-[120px] object-contain mb-4" />
+          <div className="space-y-3">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-800">
+              Tidak dapat mengirim laporan
+            </h2>
+            <p className="text-slate-600 text-base px-2 leading-relaxed max-w-sm mx-auto">
+              Koneksi internet tidak stabil laporan anda akan disimpan sementara di Draft Laporan
+            </p>
+          </div>
+          <div className="flex items-center gap-3 w-full mt-8 max-w-sm">
+            <Button
+              asChild
+              variant="outline"
+              className="flex-1 h-12 text-base rounded-xl"
+            >
+              <Link href="/anonymous-report/drafts">Lihat Draft</Link>
+            </Button>
+            <Button
+              asChild
+              variant="primary"
+              className="flex-1 h-12 text-base rounded-xl"
+            >
+              <Link href="/">Selesai</Link>
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
