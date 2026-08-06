@@ -74,7 +74,7 @@ export function SafePointsSection({ safePoints = [], userCoords = null }) {
 
                 {/* tombol rute navigasi */}
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="xs"
                   onClick={() => handleOpenDirections(sp.coordinates)}
                   className="w-full text-xs font-semibold h-7 rounded-lg border-border hover:bg-primary/20 hover:text-foreground transition-colors"
