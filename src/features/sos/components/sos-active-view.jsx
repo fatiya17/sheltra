@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { Phone, MapPin, Volume2, VolumeX, Navigation, ChevronLeft, ShieldCheck, ArrowUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,7 @@ export function SosActiveView({
   setActiveTab,
 }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showArrivedDialog, setShowArrivedDialog] = useState(false)
 
   // state untuk navigasi
   const [isSafePointNavStarted, setIsSafePointNavStarted] = useState(false)
@@ -51,6 +52,11 @@ export function SosActiveView({
   const mapContainerRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef([])
+
+  // ref panel yang menutupi peta (untuk menghitung area peta yang benar-benar terlihat)
+  const desktopPanelRef = useRef(null)
+  const mobileTopCardRef = useRef(null)
+  const mobileSheetRef = useRef(null)
 
   // format detik ke mm:ss
   const formatTimer = (totalSeconds) => {
@@ -210,6 +216,114 @@ export function SosActiveView({
     return () => { active = false }
   }, [activeTab, isSafePointNavStarted, userLocation.coords, nearestSafePoint])
 
+  // padding peta mengikuti panel yang menutupi (sidebar kiri desktop / bottom sheet mobile)
+  const getMapPadding = useCallback(() => {
+    const el = mapContainerRef.current
+    const width = el?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1024)
+    const height = el?.clientHeight || (typeof window !== "undefined" ? window.innerHeight : 768)
+
+    let raw
+    if (isDesktop) {
+      const panelWidth = desktopPanelRef.current?.offsetWidth || 400
+      raw = { top: 96, bottom: 64, left: panelWidth + 48, right: 64 }
+    } else {
+      const topHeight = mobileTopCardRef.current?.offsetHeight || 104
+      const sheetHeight = mobileSheetRef.current?.offsetHeight || 190
+      raw = {
+        // batasi agar area peta yang tersisa tetap cukup lebar
+        top: Math.min(topHeight + 28, Math.round(height * 0.22)),
+        bottom: Math.min(sheetHeight + 24, Math.round(height * 0.46)),
+        left: 32,
+        right: 32,
+      }
+    }
+
+    // kecilkan padding bila melebihi kanvas supaya fitBounds tidak gagal
+    const fitAxis = (start, end, size) => {
+      const usable = Math.max(80, size - 120)
+      const total = start + end
+      if (total <= usable) return [start, end]
+      const ratio = usable / total
+      return [Math.round(start * ratio), Math.round(end * ratio)]
+    }
+
+    const [top, bottom] = fitAxis(raw.top, raw.bottom, height)
+    const [left, right] = fitAxis(raw.left, raw.right, width)
+    return { top, bottom, left, right }
+  }, [isDesktop])
+
+  // bounding box dari titik awal, tujuan, dan rute
+  const getContentBounds = useCallback(() => {
+    const points = []
+    if (userLocation?.coords) points.push(userLocation.coords)
+    if (nearestSafePoint?.coordinates) points.push(nearestSafePoint.coordinates)
+    if (safePointRoute?.coordinates?.length >= 2) {
+      safePointRoute.coordinates.forEach((coord) => points.push(coord))
+    }
+    if (points.length === 0) return null
+
+    let minLng = points[0][0]
+    let maxLng = points[0][0]
+    let minLat = points[0][1]
+    let maxLat = points[0][1]
+
+    points.forEach(([lng, lat]) => {
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    })
+
+    return [
+      [minLng, minLat],
+      [maxLng, maxLat],
+    ]
+  }, [userLocation?.coords, nearestSafePoint, safePointRoute])
+
+  // pusatkan konten di area peta yang tidak tertutup panel
+  const fitMapToContent = useCallback(
+    (duration = 800) => {
+      const map = mapInstanceRef.current
+      if (!map) return
+
+      const padding = getMapPadding()
+      const bounds = getContentBounds()
+
+      // padding ikut tersimpan di peta, jadi zoom in/out tetap berpusat di area terlihat
+      if (!bounds) {
+        map.easeTo({ padding, duration })
+        return
+      }
+
+      map.fitBounds(bounds, { padding, duration, maxZoom: 16.5, linear: true })
+    },
+    [getMapPadding, getContentBounds]
+  )
+
+  // simpan di ref supaya peta tidak dibuat ulang saat lokasi gps diperbarui
+  const fitMapRef = useRef(fitMapToContent)
+  useEffect(() => {
+    fitMapRef.current = fitMapToContent
+  }, [fitMapToContent])
+
+  // sesuaikan framing saat bottom sheet dibuka/ditutup
+  useEffect(() => {
+    if (activeTab !== "safepoint" || isDesktop) return
+    const timer = setTimeout(() => fitMapRef.current?.(400), 340)
+    return () => clearTimeout(timer)
+  }, [sheetState, activeTab, isDesktop])
+
+  // sesuaikan framing saat ukuran layar berubah
+  useEffect(() => {
+    if (activeTab !== "safepoint") return
+    const handleResize = () => {
+      mapInstanceRef.current?.resize()
+      fitMapRef.current?.(0)
+    }
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [activeTab])
+
   // render peta mapbox
   useEffect(() => {
     if (activeTab !== "safepoint" || !mapContainerRef.current) return
@@ -270,7 +384,7 @@ export function SosActiveView({
               .addTo(map)
           }
 
-          // gambar rute pink solid (mirip safe-route)
+          // gambar rute abu/putih netral (dash) untuk safe point
           if (safePointRoute?.coordinates && safePointRoute.coordinates.length >= 2) {
             map.addSource("safepoint-route-source", {
               type: "geojson",
@@ -279,33 +393,35 @@ export function SosActiveView({
                 geometry: { type: "LineString", coordinates: safePointRoute.coordinates },
               },
             })
+            // casing putih agar dash terlihat di atas tiles
+            map.addLayer({
+              id: "safepoint-route-casing",
+              type: "line",
+              source: "safepoint-route-source",
+              layout: { "line-join": "round", "line-cap": "round" },
+              paint: {
+                "line-color": "#ffffff",
+                "line-width": 9,
+                "line-opacity": 0.9,
+              },
+            })
+            // garis utama abu terang berupa titik-titik rapi
             map.addLayer({
               id: "safepoint-route-layer",
               type: "line",
               source: "safepoint-route-source",
               layout: { "line-join": "round", "line-cap": "round" },
               paint: {
-                "line-color": "#ffa2cf",
-                "line-width": 6,
+                "line-color": "#9ca3af",
+                "line-width": 5,
                 "line-opacity": 1,
+                "line-dasharray": [0.02, 2.6],
               },
             })
-
-            // fit bounds rute
-            const bounds = new mapboxgl.LngLatBounds()
-            safePointRoute.coordinates.forEach((coord) => bounds.extend(coord))
-            map.fitBounds(bounds, {
-              padding: isDesktop
-                ? { top: 120, bottom: 120, left: 440, right: 60 }
-                : { top: 220, bottom: 260, left: 40, right: 40 },
-              duration: 1000,
-            })
-          } else {
-            const bounds = new mapboxgl.LngLatBounds()
-            bounds.extend(startCoords)
-            bounds.extend(endCoords)
-            map.fitBounds(bounds, { padding: 80, duration: 1000 })
           }
+
+          // pusatkan rute/marker di area peta yang terlihat
+          fitMapRef.current?.(900)
         })
       } catch (err) {
         console.warn("gagal load peta:", err)
@@ -327,14 +443,14 @@ export function SosActiveView({
     if (isDesktop) {
       // tampilan desktop
       return (
-        <div className="fixed inset-0 w-screen h-screen bg-background z-50 select-none">
+        <div className="fixed inset-0 w-screen h-screen bg-white z-50 select-none">
           {/* peta full-bleed desktop */}
           <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" />
 
           {/* loading rute */}
           {isSafePointNavStarted && isLoadingRoute && (
-            <div className="absolute inset-0 bg-background/50 backdrop-blur-xs flex items-center justify-center z-20">
-              <div className="p-3 bg-card rounded-xl shadow-md border border-border flex items-center gap-2">
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-xs flex items-center justify-center z-20">
+              <div className="p-3 bg-white rounded-xl shadow-md border border-border flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 <span className="text-xs font-medium">Mencari Rute Tercepat...</span>
               </div>
@@ -343,11 +459,11 @@ export function SosActiveView({
 
           {/* floating sidebar desktop — setengah tinggi */}
           <div className="pointer-events-none absolute inset-0 z-10">
-            <aside className="absolute top-4 left-4 z-10 w-[400px] bg-card/95 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-input pointer-events-auto flex flex-col" style={{ maxHeight: "50vh" }}>
+            <aside ref={desktopPanelRef} className="absolute top-4 left-4 z-10 w-[400px] bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-input pointer-events-auto flex flex-col" style={{ maxHeight: "50vh" }}>
               
               {/* card rute atas */}
               <div className="shrink-0">
-                <div className="bg-card border-b border-input p-3 space-y-1.5">
+                <div className="bg-white border-b border-input p-3 space-y-1.5">
                   {/* titik asal */}
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0">
@@ -397,7 +513,7 @@ export function SosActiveView({
               </div>
 
               {/* footer — tombol sebelahan */}
-              <div className="p-3 border-t border-border/60 bg-card shrink-0">
+              <div className="p-3 border-t border-border/60 bg-white shrink-0">
                 <div className="grid grid-cols-2 gap-2">
                   {nearestSafePoint && (
                     <Button
@@ -405,10 +521,11 @@ export function SosActiveView({
                       variant="outline"
                       className="h-10 rounded-xl font-semibold text-[14px] bg-[#d6e4f0] hover:bg-[#c2d7e7] text-slate-800 border-none gap-1.5"
                       onClick={() => {
-                        setIsSafePointNavStarted((prev) => {
-                          if (prev) setSafePointRoute(null)
-                          return !prev
-                        })
+                        if (isSafePointNavStarted) {
+                          setShowArrivedDialog(true)
+                        } else {
+                          setIsSafePointNavStarted(true)
+                        }
                       }}
                     >
                       <Navigation className="w-3.5 h-3.5" />
@@ -432,7 +549,7 @@ export function SosActiveView({
             <button
               type="button"
               onClick={() => setActiveTab("main")}
-              className="absolute top-4 right-4 z-20 bg-card/95 backdrop-blur-md rounded-full px-4 py-2 text-xs font-semibold text-foreground shadow-lg border border-input hover:bg-muted transition-colors flex items-center gap-1.5 pointer-events-auto"
+              className="absolute top-4 right-4 z-20 bg-white/95 backdrop-blur-md rounded-full px-4 py-2 text-xs font-semibold text-foreground shadow-lg border border-input hover:bg-muted transition-colors flex items-center gap-1.5 pointer-events-auto"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               Kembali ke SOS
@@ -444,16 +561,25 @@ export function SosActiveView({
             onClose={() => setShowCancelDialog(false)}
             onConfirm={() => { setShowCancelDialog(false); onCancelSos() }}
           />
+          <ArrivedDialog
+            open={showArrivedDialog}
+            onClose={() => setShowArrivedDialog(false)}
+            onConfirm={() => {
+              setShowArrivedDialog(false)
+              setIsSafePointNavStarted(false)
+              setSafePointRoute(null)
+            }}
+          />
         </div>
       )
     } else {
       // tampilan mobile
       return (
-        <div className="fixed inset-0 w-screen h-screen bg-background z-50 flex flex-col select-none">
+        <div className="fixed inset-0 w-screen h-screen bg-white z-50 flex flex-col select-none">
 
           {/* top search card — percis safe-route mobile */}
-          <div className="absolute top-3 left-3 right-3 z-30 pointer-events-auto">
-            <div className="bg-card/95 backdrop-blur-md rounded-2xl border border-input shadow-lg overflow-hidden">
+          <div ref={mobileTopCardRef} className="absolute top-3 left-3 right-3 z-30 pointer-events-auto">
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-input shadow-lg overflow-hidden">
               
               {/* baris asal & tujuan — tanpa background, transparan */}
               <div className="p-3 space-y-1.5">
@@ -499,8 +625,8 @@ export function SosActiveView({
 
           {/* loading overlay */}
           {isSafePointNavStarted && isLoadingRoute && (
-            <div className="absolute inset-0 bg-background/50 backdrop-blur-xs flex items-center justify-center z-20">
-              <div className="p-3 bg-card rounded-xl shadow-md border border-border flex items-center gap-2">
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-xs flex items-center justify-center z-20">
+              <div className="p-3 bg-white rounded-xl shadow-md border border-border flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 <span className="text-xs font-medium">Mencari Rute Tercepat...</span>
               </div>
@@ -508,7 +634,7 @@ export function SosActiveView({
           )}
 
           {/* bottom draggable sheet — percis safe-route */}
-          <div className="absolute bottom-0 left-0 right-0 z-30 bg-card/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
+          <div ref={mobileSheetRef} className="absolute bottom-0 left-0 right-0 z-30 bg-white/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
             {/* drag handle */}
             <div
               onTouchStart={handleTouchStart}
@@ -565,7 +691,7 @@ export function SosActiveView({
             </div>
 
             {/* footer tombol (selalu tampil, tidak ikut hide) */}
-            <div className="shrink-0 px-4 pb-3 pt-2 border-t border-border/60 bg-card/98">
+            <div className="shrink-0 px-4 pb-3 pt-2 border-t border-border/60 bg-white/98">
               <div className="grid grid-cols-2 gap-2">
                 {nearestSafePoint && (
                   <Button
@@ -573,10 +699,11 @@ export function SosActiveView({
                     variant="outline"
                     className="h-11 rounded-2xl font-semibold text-[14px] bg-[#d6e4f0] hover:bg-[#c2d7e7] text-slate-800 border-none gap-1.5"
                     onClick={() => {
-                      setIsSafePointNavStarted((prev) => {
-                        if (prev) setSafePointRoute(null)
-                        return !prev
-                      })
+                      if (isSafePointNavStarted) {
+                        setShowArrivedDialog(true)
+                      } else {
+                        setIsSafePointNavStarted(true)
+                      }
                     }}
                   >
                     <Navigation className="w-3.5 h-3.5" />
@@ -601,7 +728,7 @@ export function SosActiveView({
           <button
             type="button"
             onClick={() => setActiveTab("main")}
-            className="absolute top-3 left-3 z-40 pointer-events-auto bg-card/90 backdrop-blur-sm rounded-full p-2 shadow-md border border-input"
+            className="absolute top-3 left-3 z-40 pointer-events-auto bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md border border-input"
             aria-label="Kembali"
           >
             <ChevronLeft className="w-5 h-5 text-foreground" />
@@ -611,6 +738,15 @@ export function SosActiveView({
             open={showCancelDialog}
             onClose={() => setShowCancelDialog(false)}
             onConfirm={() => { setShowCancelDialog(false); onCancelSos() }}
+          />
+          <ArrivedDialog
+            open={showArrivedDialog}
+            onClose={() => setShowArrivedDialog(false)}
+            onConfirm={() => {
+              setShowArrivedDialog(false)
+              setIsSafePointNavStarted(false)
+              setSafePointRoute(null)
+            }}
           />
         </div>
       )
@@ -623,7 +759,7 @@ export function SosActiveView({
   return (
     <>
       {/* MOBILE: full-screen layout */}
-      <div className="flex flex-col lg:hidden min-h-[calc(100vh-2rem)] bg-background">
+      <div className="flex flex-col lg:hidden min-h-[calc(100vh-2rem)] bg-white">
         {/* header banner */}
         <div className="-mx-4 -mt-4 bg-[#e62058] text-white px-4 py-3.5 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
@@ -839,17 +975,26 @@ export function SosActiveView({
       </div>
 
       {/* dialog konfirmasi */}
-      <CancelDialog
-        open={showCancelDialog}
-        onClose={() => setShowCancelDialog(false)}
-        onConfirm={() => {
-          setShowCancelDialog(false)
-          onCancelSos()
-        }}
-      />
-    </>
-  )
-}
+       <CancelDialog
+         open={showCancelDialog}
+         onClose={() => setShowCancelDialog(false)}
+         onConfirm={() => {
+           setShowCancelDialog(false)
+           onCancelSos()
+         }}
+       />
+       <ArrivedDialog
+         open={showArrivedDialog}
+         onClose={() => setShowArrivedDialog(false)}
+         onConfirm={() => {
+           setShowArrivedDialog(false)
+           setIsSafePointNavStarted(false)
+           setSafePointRoute(null)
+         }}
+       />
+     </>
+   )
+ }
 
 /** Ringkasan SOS untuk sidebar desktop */
 export function SosActiveSidebar({ userLocation = {} }) {
@@ -980,7 +1125,7 @@ function NavSimulationSteps({ safePointRoute, nearestSafePoint }) {
 function CancelDialog({ open, onClose, onConfirm }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-[380px] bg-card p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
+      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-[380px] bg-white p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
         <Image src="/success.svg" alt="Konfirmasi pembatalan SOS" width={128} height={128} className="w-32 h-32 object-contain" />
         <div className="space-y-2">
           <DialogHeader>
@@ -1001,6 +1146,48 @@ function CancelDialog({ open, onClose, onConfirm }) {
             onClick={onConfirm}
           >
             Ya, Saya sudah aman
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ArrivedDialog({ open, onClose, onConfirm }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-[380px] bg-white p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-2xl border-none">
+        <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+          <ShieldCheck className="w-8 h-8 text-emerald-600" />
+        </div>
+        <div className="space-y-2">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold tracking-tight text-slate-800">
+              Sudah Sampai dengan Aman?
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="text-slate-600 text-sm px-2 leading-relaxed">
+            Konfirmasi bahwa Anda telah tiba di tujuan dengan selamat.
+          </DialogDescription>
+        </div>
+        <div className="w-full grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="pill"
+            className="w-full"
+            onClick={onClose}
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            variant="pill"
+            size="pill"
+            className="w-full"
+            onClick={onConfirm}
+          >
+            Ya, Sudah Sampai
           </Button>
         </div>
       </DialogContent>
