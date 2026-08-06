@@ -125,77 +125,75 @@ export function RouteMap({
         markersRef.current = []
 
         const activeRoute = routes.find((r) => r.id === selectedRouteId) || routes[0]
-
         routes.forEach((route) => {
           const sourceId = `route-source-${route.id}`
           const layerId = `route-layer-${route.id}`
+          const dotsSourceId = `route-dots-source-${route.id}`
+          const dotsCasingId = `route-dots-casing-${route.id}`
+          const dotsLayerId = `route-dots-layer-${route.id}`
 
-          if (map.getLayer(layerId)) {
-            map.removeLayer(layerId)
-          }
-
-          if (map.getSource(sourceId)) {
-            map.removeSource(sourceId)
-          }
+          if (map.getLayer(layerId)) map.removeLayer(layerId)
+          if (map.getLayer(dotsLayerId)) map.removeLayer(dotsLayerId)
+          if (map.getLayer(dotsCasingId)) map.removeLayer(dotsCasingId)
+          if (map.getSource(sourceId)) map.removeSource(sourceId)
+          if (map.getSource(dotsSourceId)) map.removeSource(dotsSourceId)
         })
 
-        // gambar garis rute
-        if (activeRoute) {
+        // gambar titik-titik lingkaran rute
+        if (activeRoute && activeRoute.coordinates?.length >= 2) {
           const route = activeRoute
-          const sourceId = `route-source-${route.id}`
-          const layerId = `route-layer-${route.id}`
-          const isSelected = route.id === selectedRouteId
+          const dotsSourceId = `route-dots-source-${route.id}`
+          const dotsCasingId = `route-dots-casing-${route.id}`
+          const dotsLayerId = `route-dots-layer-${route.id}`
 
-          const geojson = {
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: route.coordinates,
-            },
+          const updateScreenDots = () => {
+            try {
+              const src = map.getSource(dotsSourceId)
+              if (src) {
+                src.setData(generateScreenSpaceDots(route.coordinates, map, 20))
+              }
+            } catch (e) {}
           }
 
-          if (map.getSource(sourceId)) {
-            map.getSource(sourceId).setData(geojson)
+          const dotsGeoJson = generateScreenSpaceDots(route.coordinates, map, 20)
+          if (!map.getSource(dotsSourceId)) {
+            map.addSource(dotsSourceId, { type: "geojson", data: dotsGeoJson })
           } else {
-            map.addSource(sourceId, {
-              type: "geojson",
-              data: geojson,
-            })
+            map.getSource(dotsSourceId).setData(dotsGeoJson)
+          }
 
+          if (!map.getLayer(dotsCasingId)) {
             map.addLayer({
-              id: layerId,
-              type: "line",
-              source: sourceId,
-              layout: {
-                "line-join": "round",
-                "line-cap": "round",
-              },
+              id: dotsCasingId,
+              type: "circle",
+              source: dotsSourceId,
               paint: {
-                "line-color": route.color || "#10b981",
-                "line-width": isSelected ? 7 : 4,
-                "line-opacity": 1,
+                "circle-radius": 5.5,
+                "circle-color": "#ffffff",
+                "circle-opacity": 0.95,
               },
             })
+          }
 
-            // event klik garis rute
-            map.on("click", layerId, () => {
-              if (onSelectRoute) onSelectRoute(route.id)
-            })
-
-            map.on("mouseenter", layerId, () => {
-              map.getCanvas().style.cursor = "pointer"
-            })
-            map.on("mouseleave", layerId, () => {
-              map.getCanvas().style.cursor = ""
+          if (!map.getLayer(dotsLayerId)) {
+            map.addLayer({
+              id: dotsLayerId,
+              type: "circle",
+              source: dotsSourceId,
+              paint: {
+                "circle-radius": 3.8,
+                "circle-color": route.color || "#e8195a",
+                "circle-opacity": 1,
+              },
             })
           }
 
-          // update tampilan layer saat route aktif berganti
-          if (map.getLayer(layerId)) {
-            map.setPaintProperty(layerId, "line-width", isSelected ? 7 : 4)
-            map.setPaintProperty(layerId, "line-opacity", 1)
-          }
+          map.off("zoom", updateScreenDots)
+          map.off("zoomend", updateScreenDots)
+          map.off("moveend", updateScreenDots)
+          map.on("zoom", updateScreenDots)
+          map.on("zoomend", updateScreenDots)
+          map.on("moveend", updateScreenDots)
         }
 
         // render marker safe points
@@ -259,11 +257,10 @@ export function RouteMap({
 
           // marker tujuan
           const endEl = document.createElement("div")
-          endEl.className =
-            "w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg border-2 border-white font-semibold text-sm"
-          endEl.innerText = "B"
+          endEl.className = "w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl"
+          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
 
-          const endMarker = new mapboxgl.Marker({ element: endEl })
+          const endMarker = new mapboxgl.Marker({ element: endEl, anchor: "bottom" })
             .setLngLat(endCoords)
             .setPopup(new mapboxgl.Popup({ offset: 10 }).setText("Titik Tujuan (Destination)"))
             .addTo(map)
@@ -341,3 +338,51 @@ export function RouteMap({
     </div>
   )
 }
+
+// interpolasi titik-titik lingkaran sempurna berbasis piksel layar konstan
+function generateScreenSpaceDots(coordinates, map, pixelSpacing = 20) {
+  if (!coordinates || coordinates.length < 2 || !map || typeof map.project !== "function") {
+    return { type: "FeatureCollection", features: [] }
+  }
+
+  const features = []
+  let leftover = 0
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const c1 = coordinates[i]
+    const c2 = coordinates[i + 1]
+    const p1 = map.project(c1)
+    const p2 = map.project(c2)
+
+    const dx = p2.x - p1.x
+    const dy = p2.y - p1.y
+    const segPixelDist = Math.sqrt(dx * dx + dy * dy)
+
+    if (segPixelDist <= 0) continue
+
+    let dist = leftover > 0 ? leftover : 0
+    while (dist <= segPixelDist) {
+      const t = dist / segPixelDist
+      const x = p1.x + dx * t
+      const y = p1.y + dy * t
+      const unprojected = map.unproject([x, y])
+
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Point",
+          coordinates: [unprojected.lng, unprojected.lat],
+        },
+      })
+      dist += pixelSpacing
+    }
+    leftover = dist - segPixelDist
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  }
+}
+
