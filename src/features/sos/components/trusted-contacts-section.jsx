@@ -80,7 +80,7 @@ export function TrustedContactsSection({
   }
 
   return (
-    <Card className="rounded-2xl border-none shadow-sm bg-card/90 backdrop-blur-xs">
+    <Card className="rounded-2xl border-none shadow-sm bg-white/90 backdrop-blur-xs">
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4 sm:px-5">
         <div>
           <CardTitle className="text-sm sm:text-base font-bold text-foreground">
@@ -166,7 +166,7 @@ export function TrustedContactsSection({
 
       {/* modal dialog tambah / edit kontak */}
       <Dialog open={isOpenModal} onOpenChange={setIsOpenModal}>
-        <DialogContent className="max-w-sm rounded-2xl p-5 bg-card">
+        <DialogContent className="max-w-sm rounded-2xl p-5 bg-white">
           <DialogHeader>
             <DialogTitle className="text-base font-bold">
               {editingContact ? "Ubah Kontak Tepercaya" : "Tambah Kontak Tepercaya"}
