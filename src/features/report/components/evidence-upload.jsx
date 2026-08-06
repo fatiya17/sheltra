@@ -126,18 +126,19 @@ export function EvidenceUpload({ evidence, onEvidenceChange }) {
       <Label>Unggah Bukti Foto / Video (Opsional)</Label>
       {!evidence ? (
         <label className="flex items-center gap-4 border border-input bg-card rounded-2xl p-3 cursor-pointer hover:bg-muted/10 transition-colors">
-          <div className="flex items-center justify-center w-16 h-16 border border-dashed border-input bg-muted/20 rounded-xl shrink-0 relative select-none">
+          <div className="flex items-center justify-center w-[84px] h-[84px] border border-dashed border-secondary bg-secondary/20 rounded-xl shrink-0 relative select-none">
             {isProcessing ? (
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
             ) : (
-              <div className="relative w-10 h-10">
-                <Film className="absolute top-0 right-1 w-6 h-6 text-input" strokeWidth={1.5} />
+              <div className="relative w-[52px] h-[52px]">
+                <Film className="absolute top-0 right-1 w-8 h-8 text-primary" strokeWidth={1.5} fill="white" />
                 <ImageIcon
-                  className="absolute bottom-1 left-0 w-6 h-6 text-input bg-card rounded-md p-[1px]"
+                  className="absolute bottom-1 left-0 w-8 h-8 text-primary"
                   strokeWidth={1.5}
+                  fill="white"
                 />
-                <div className="absolute bottom-0 right-1 w-4 h-4 bg-input text-white rounded-full flex items-center justify-center shadow-sm select-none pointer-events-none">
-                  <span className="text-[10px] font-bold leading-none -mt-0.5">+</span>
+                <div className="absolute bottom-0 right-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-sm select-none pointer-events-none">
+                  <span className="text-sm font-bold leading-none -mt-0.5">+</span>
                 </div>
               </div>
             )}
