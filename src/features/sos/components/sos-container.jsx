@@ -114,15 +114,15 @@ export default function SosContainer() {
   // 2. TAMPILAN SIAGA SOS (IDLE)
   // =========================================================================
   return (
-    <div className="w-full p-4 md:px-8 md:py-6 flex items-center min-h-[60vh] lg:min-h-[70vh]">
+    <div className="w-full p-4 md:px-8 md:py-6 flex items-center min-h-[80vh] lg:min-h-[70vh]">
       {/* 
         Layout Desktop: 3 kolom — bantuan cepat, tombol SOS, titik aman.
-        Layout Mobile: Stack vertikal otomatis
+        Layout Mobile: hanya tombol SOS (panel samping disembunyikan)
       */}
       <div className="flex flex-col lg:grid lg:grid-cols-[340px_minmax(0,1fr)_340px] lg:items-start gap-6 w-full">
         
-        {/* Kolom kiri: bantuan cepat */}
-        <div className="w-full order-1 lg:sticky lg:top-6">
+        {/* Kolom kiri: bantuan cepat — desktop saja */}
+        <div className="hidden lg:block w-full order-1 lg:sticky lg:top-6">
           <EmergencyHotlinesSection />
         </div>
 
@@ -136,8 +136,8 @@ export default function SosContainer() {
           />
         </div>
 
-        {/* Kolom kanan: titik aman */}
-        <div className="w-full order-3 lg:sticky lg:top-6">
+        {/* Kolom kanan: titik aman — desktop saja */}
+        <div className="hidden lg:block w-full order-3 lg:sticky lg:top-6">
           <SafePointsSection safePoints={safePoints} userCoords={userLocation.coords} />
         </div>
         
