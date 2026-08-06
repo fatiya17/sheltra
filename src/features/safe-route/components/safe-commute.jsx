@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowUp,
   Clock,
@@ -27,7 +28,7 @@ import {
   CarTaxiFront,
 } from "lucide-react"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import { faLightbulb, faRoute, faChartSimple } from "@fortawesome/free-solid-svg-icons"
+import { faLightbulb, faRoute, faChartSimple, faMapPin } from "@fortawesome/free-solid-svg-icons"
 import {
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
@@ -49,10 +50,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import "mapbox-gl/dist/mapbox-gl.css"
 
 export default function SafeCommute() {
+  const router = useRouter()
   const toast = useToast()
   const mapContainerRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef([])
+  const miniMapContainerRef = useRef(null)
+  const miniMapInstanceRef = useRef(null)
+  const [hasRequestedGps, setHasRequestedGps] = useState(false)
 
   // ── Mobile flow step state ──────────────────────────────────────────
   // "home"         → Alur 1: Gojek-style destination input
@@ -203,6 +208,49 @@ export default function SafeCommute() {
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null } }
   }, [])
 
+  // ── Auto GPS & Mini Map Init for Home (Alur 1) ─────────────────────
+  useEffect(() => {
+    if (mobileStep === "home" && !hasRequestedGps) {
+      setHasRequestedGps(true)
+      // Gunakan setTimeout agar tidak bertabrakan dengan render cycle
+      setTimeout(() => {
+        handleDetectGps()
+      }, 500)
+    }
+  }, [mobileStep, hasRequestedGps])
+
+  useEffect(() => {
+    if (mobileStep !== "home" || !miniMapContainerRef.current) return
+    if (miniMapInstanceRef.current) {
+      miniMapInstanceRef.current.setCenter(originCoords)
+      return
+    }
+    import("mapbox-gl").then((mod) => {
+      const mapboxgl = mod.default
+      mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
+      try {
+        const map = new mapboxgl.Map({
+          container: miniMapContainerRef.current,
+          style: "mapbox://styles/mapbox/streets-v12",
+          center: originCoords,
+          zoom: 15,
+          interactive: false,
+          attributionControl: false,
+        })
+        miniMapInstanceRef.current = map
+        map.on("load", () => {
+          map.resize()
+        })
+      } catch (err) { console.warn("Gagal inisialisasi mini map:", err) }
+    })
+    return () => {
+      if (miniMapInstanceRef.current) {
+        miniMapInstanceRef.current.remove()
+        miniMapInstanceRef.current = null
+      }
+    }
+  }, [mobileStep, originCoords])
+
   // ── loadRoutes ──────────────────────────────────────────────────────
   const loadRoutes = useCallback(async (params, options = {}) => {
     const { showOverlay = true } = options
@@ -231,22 +279,68 @@ export default function SafeCommute() {
         const currentStyle = map.getStyle()
         if (currentStyle?.layers) {
           currentStyle.layers.forEach((l) => {
-            if (l.id.startsWith("route-layer-") || l.id === "safe-route-active-layer") { if (map.getLayer(l.id)) map.removeLayer(l.id) }
+            if (l.id.startsWith("route-layer-") || l.id === "safe-route-active-layer" || l.id.startsWith("safe-route-dots-")) { if (map.getLayer(l.id)) map.removeLayer(l.id) }
           })
         }
         if (currentStyle?.sources) {
           Object.keys(currentStyle.sources).forEach((sId) => {
-            if (sId.startsWith("route-source-") || sId === "safe-route-active-source") { if (map.getSource(sId)) map.removeSource(sId) }
+            if (sId.startsWith("route-source-") || sId === "safe-route-active-source" || sId.startsWith("safe-route-dots-")) { if (map.getSource(sId)) map.removeSource(sId) }
           })
         }
         if (activeRoute?.coordinates?.length >= 2) {
-          const sourceId = "safe-route-active-source"; const layerId = "safe-route-active-layer"
-          const geojson = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: activeRoute.coordinates } }
-          if (!map.getSource(sourceId)) map.addSource(sourceId, { type: "geojson", data: geojson })
-          else map.getSource(sourceId).setData(geojson)
-          if (!map.getLayer(layerId)) {
-            map.addLayer({ id: layerId, type: "line", source: sourceId, layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": activeRoute.color || "#ffa2cf", "line-width": 5, "line-opacity": 0.92 } })
+          const dotsSourceId = "safe-route-dots-source"
+          const dotsCasingId = "safe-route-dots-casing"
+          const dotsLayerId = "safe-route-dots-layer"
+
+          const updateScreenDots = () => {
+            try {
+              const src = map.getSource(dotsSourceId)
+              if (src) {
+                src.setData(generateScreenSpaceDots(activeRoute.coordinates, map, 20))
+              }
+            } catch (e) {}
           }
+
+          const dotsGeoJson = generateScreenSpaceDots(activeRoute.coordinates, map, 20)
+          if (!map.getSource(dotsSourceId)) {
+            map.addSource(dotsSourceId, { type: "geojson", data: dotsGeoJson })
+          } else {
+            map.getSource(dotsSourceId).setData(dotsGeoJson)
+          }
+
+          if (!map.getLayer(dotsCasingId)) {
+            map.addLayer({
+              id: dotsCasingId,
+              type: "circle",
+              source: dotsSourceId,
+              paint: {
+                "circle-radius": 5.5,
+                "circle-color": "#ffffff",
+                "circle-opacity": 0.95,
+              },
+            })
+          }
+
+          if (!map.getLayer(dotsLayerId)) {
+            map.addLayer({
+              id: dotsLayerId,
+              type: "circle",
+              source: dotsSourceId,
+              paint: {
+                "circle-radius": 3.8,
+                "circle-color": activeRoute.color || "#e8195a",
+                "circle-opacity": 1,
+              },
+            })
+          }
+
+          // update titik secara dinamis saat zoom / move
+          map.off("zoom", updateScreenDots)
+          map.off("zoomend", updateScreenDots)
+          map.off("moveend", updateScreenDots)
+          map.on("zoom", updateScreenDots)
+          map.on("zoomend", updateScreenDots)
+          map.on("moveend", updateScreenDots)
         }
         if (showSafePoints) {
           safePoints.forEach((sp) => {
@@ -276,7 +370,7 @@ export default function SafeCommute() {
           startEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ffa2cf" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
           const endEl = document.createElement("div")
           endEl.className = "w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl"
-          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#db2777" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
           const startMarker = new mapboxgl.Marker({ element: startEl, anchor: "bottom" }).setLngLat(startCoords).addTo(map)
           const endMarker = new mapboxgl.Marker({ element: endEl, anchor: "bottom" }).setLngLat(endCoords).addTo(map)
           markersRef.current.push(startMarker, endMarker)
@@ -362,6 +456,15 @@ export default function SafeCommute() {
     setIsMobileSearchOpen(false)
     loadRoutes({ origin: params.origin, destination: params.destination, departureTime: params.departureTime || departureTime, travelMode: params.travelMode || travelMode })
   }
+  // buka halaman protected trip
+  const handleGoToProtectedTrip = () => {
+    const params = new URLSearchParams()
+    if (originText) params.set("origin", originText)
+    if (destinationText) params.set("destination", destinationText)
+    const durationNum = parseInt(activeRoute?.duration || "5", 10) || 5
+    params.set("duration", durationNum.toString())
+    router.push(`/guardian?${params.toString()}`)
+  }
   const handleShareTracking = () => {
     if (navigator.share) {
       navigator.share({ title: "Live Safe Tracking", text: `Saya menuju ${destinationText}.`, url: window.location.href })
@@ -397,9 +500,9 @@ export default function SafeCommute() {
       travelMode,
     }, { showOverlay: false })
 
-    // animate steps one by one (1500ms each)
+    // animate steps one by one (400ms each -> total 2 detik)
     for (let i = 1; i <= LOADING_STEPS.length; i++) {
-      await new Promise((r) => setTimeout(r, 1500))
+      await new Promise((r) => setTimeout(r, 400))
       setLoadingCurrentStep(i + 1)
       setLoadingStepsDone((prev) => [...prev, i])
     }
@@ -501,28 +604,14 @@ export default function SafeCommute() {
           <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
             {/* mini map preview */}
             <div className="h-36 w-full bg-gray-100 relative overflow-hidden">
-              {/* map placeholder illustration */}
-              <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#e8f5e9 0%,#fce4ec 100%)" }}>
-                <svg className="absolute inset-0 w-full h-full opacity-40" viewBox="0 0 400 160" fill="none">
-                  <rect x="0" y="0" width="400" height="160" fill="#f5f5f5"/>
-                  <path d="M0 80 Q80 40 160 90 T320 60 T400 80" stroke="#ccc" strokeWidth="24" fill="none"/>
-                  <path d="M0 100 Q100 60 200 100 T400 80" stroke="#e5e7eb" strokeWidth="16" fill="none"/>
-                  <path d="M60 140 Q120 60 200 90 T360 50" stroke="#fca5a5" strokeWidth="3" strokeDasharray="8 4" fill="none"/>
-                </svg>
-                <div className="absolute top-1/2 left-[28%] -translate-y-1/2 w-7 h-7 bg-white rounded-full shadow-md flex items-center justify-center">
-                  <div className="w-4 h-4 rounded-full bg-[#e8195a] flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-white" />
-                  </div>
-                </div>
-                <div className="absolute top-1/3 right-[20%] w-6 h-8 flex items-end justify-center">
-                  <svg viewBox="0 0 24 32" width="24" height="32" fill="none"><path d="M12 0C5.4 0 0 5.4 0 12C0 20.5 12 32 12 32C12 32 24 20.5 24 12C24 5.4 18.6 0 12 0Z" fill="#dc2626"/><circle cx="12" cy="12" r="4" fill="white"/></svg>
-                </div>
-              </div>
+              <div ref={miniMapContainerRef} className="absolute inset-0 w-full h-full" />
+              {/* titik awal di tengah mini map */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#ffa2cf] rounded-full shadow-xs" />
             </div>
 
             {/* search input — modal style */}
             <div className="px-3.5 py-3 flex items-center gap-3 border-t border-border/60">
-              <div className="relative w-6 h-6 rounded-full bg-[#db2777] shrink-0 shadow-2xs">
+              <div className="relative w-6 h-6 rounded-full bg-primary shrink-0 shadow-2xs">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
               </div>
               <input
@@ -533,8 +622,8 @@ export default function SafeCommute() {
                 className="flex-1 text-sm text-foreground placeholder-muted-foreground outline-none bg-transparent"
                 onKeyDown={(e) => { if (e.key === "Enter" && homeSearchQuery.trim()) handleHomeSelectDestination(homeSearchQuery.trim(), null) }}
               />
-              <button type="button" onClick={() => homeSearchQuery.trim() && handleHomeSelectDestination(homeSearchQuery.trim(), null)} className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center text-muted-foreground hover:bg-pink-50 hover:text-[#e8195a] transition-colors">
-                <Search className="w-4 h-4" />
+              <button type="button" onClick={() => homeSearchQuery.trim() && handleHomeSelectDestination(homeSearchQuery.trim(), null)} className="flex items-center justify-center transition-colors">
+                <Search className="w-5 h-5 text-[#DFE5EE]" />
               </button>
             </div>
           </div>
@@ -572,7 +661,7 @@ export default function SafeCommute() {
 
         <div className="flex-1 px-4 flex flex-col gap-4 overflow-y-auto pb-32">
           {/* greeting */}
-          <p className="text-base font-semibold text-gray-800">Mau pergi kemana, Klee?</p>
+          <p className="text-base font-semibold text-gray-800">Kamu lagi ada dimana, Klee?</p>
 
           {/* origin + destination inputs — modal style card with connector */}
           <div className="bg-white border border-input rounded-3xl p-3.5 shadow-sm space-y-2">
@@ -585,7 +674,7 @@ export default function SafeCommute() {
                     <div className="w-3 h-3 bg-sky-500 rounded-full border-2 border-white shadow-sm relative z-10" />
                   </>
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-xs">
+                  <div className="w-6 h-6 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shadow-xs">
                     <ArrowUp className="w-3.5 h-3.5 stroke-[3]" />
                   </div>
                 )}
@@ -618,7 +707,7 @@ export default function SafeCommute() {
 
             {/* destination */}
             <div className="flex items-center gap-3">
-              <div className="relative w-6 h-6 rounded-full bg-[#db2777] shrink-0 shadow-2xs">
+              <div className="relative w-6 h-6 rounded-full bg-primary shrink-0 shadow-2xs">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
               </div>
               <input
@@ -634,9 +723,9 @@ export default function SafeCommute() {
           {/* recent suggestions */}
           <div className="divide-y divide-gray-100">
             {RECENT_DESTINATIONS.slice(0, 4).map((rec) => (
-              <button key={rec.id} type="button" onClick={() => { setDestinationText(rec.name); setDestinationCoords(rec.coordinates) }} className="w-full px-2 py-3.5 flex items-center gap-3 hover:bg-pink-50/40 transition-colors text-left">
-                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-gray-400">
-                  <Clock className="w-4 h-4" />
+              <button key={rec.id} type="button" onClick={() => { setOriginText(rec.name); setOriginCoords(rec.coordinates) }} className="w-full px-2 py-3.5 flex items-center gap-3 hover:bg-pink-50/40 transition-colors text-left">
+                <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                  <FontAwesomeIcon icon={faMapPin} style={{ color: "#DFE5EE", width: "16px", height: "16px" }} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-gray-800 truncate">{rec.name}</p>
@@ -649,15 +738,15 @@ export default function SafeCommute() {
 
         {/* sticky bottom CTA */}
         <div className="sticky bottom-0 left-0 right-0 px-4 pb-8 pt-3 bg-white border-t border-gray-100 shadow-xl">
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={handleStartSearch}
             disabled={!destinationText.trim()}
-            className="w-full py-4 rounded-2xl bg-[#e8195a] hover:bg-[#c01248] disabled:opacity-40 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-pink-500/30 transition-all"
+            className="w-full py-3.5 rounded-2xl font-bold text-base shadow-lg shadow-primary/25 transition-all"
           >
-            <ShieldCheck className="w-5 h-5" />
             Cari rute aman
-          </button>
+          </Button>
         </div>
 
         {/* GPS permission dialog */}
@@ -684,10 +773,10 @@ export default function SafeCommute() {
               </div>
             ) : (
               <div className="flex gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowGpsDialog(false)} className="flex-1">
+                <Button type="button" variant="secondary" onClick={() => setShowGpsDialog(false)} className="flex-1">
                   Batal
                 </Button>
-                <Button type="button" variant="pill" size="pill" onClick={handleGpsConfirm} className="flex-1">
+                <Button type="button" variant="primary" onClick={handleGpsConfirm} className="flex-1">
                   <LocateFixed className="w-4 h-4" />
                   Izinkan Lokasi
                 </Button>
@@ -787,7 +876,7 @@ export default function SafeCommute() {
           {/* origin + destination — modal style card */}
           <div className="bg-white border border-input rounded-3xl p-3.5 shadow-sm space-y-2">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0 shadow-xs">
+              <div className="w-6 h-6 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0 shadow-xs">
                 <ArrowUp className="w-3.5 h-3.5 stroke-[3]" />
               </div>
               <p className="text-sm text-foreground truncate flex-1 min-w-0">{originText}</p>
@@ -801,7 +890,7 @@ export default function SafeCommute() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="relative w-6 h-6 rounded-full bg-[#db2777] shrink-0 shadow-2xs">
+              <div className="relative w-6 h-6 rounded-full bg-primary shrink-0 shadow-2xs">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
               </div>
               <p className="text-sm text-foreground truncate flex-1 min-w-0">{destinationText}</p>
@@ -867,9 +956,9 @@ export default function SafeCommute() {
                     stroke={route.riskLabel === "Risiko Rendah" ? "#16a34a" : route.riskLabel === "Risiko Sedang" ? "#d97706" : "#dc2626"}
                     strokeWidth="3.5" strokeLinecap="round" fill="none"
                   />
-                  <circle cx="30" cy={idx === 0 ? 70 : idx === 1 ? 80 : 60} r="7" fill="#fca5a5" stroke="white" strokeWidth="2.5"/>
+                  <circle cx="30" cy={idx === 0 ? 70 : idx === 1 ? 80 : 60} r="7" fill="#ffa2cf" stroke="white" strokeWidth="2.5"/>
                   <svg x="278" y={idx === 0 ? 28 : idx === 1 ? 43 : 58} width="22" height="28" viewBox="0 0 38 48" fill="none">
-                    <path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48S38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#dc2626" stroke="#fff" strokeWidth="3"/>
+                    <path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48S38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="var(--color-primary)" stroke="#fff" strokeWidth="3"/>
                     <circle cx="19" cy="19" r="6.5" fill="white"/>
                   </svg>
                 </svg>
@@ -879,9 +968,9 @@ export default function SafeCommute() {
               <div className="px-4 pb-4">
                 <Button
                   type="button"
-                  variant={route.recommended ? "default" : "outline"}
+                  variant="outline"
                   onClick={() => handleViewRouteDetail(route.id)}
-                  className={`w-full rounded-2xl py-3 font-bold text-sm h-auto ${route.recommended ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/30" : "border-primary text-primary hover:bg-primary/5"}`}
+                  className="w-full rounded-2xl py-3 font-bold text-sm h-auto border-primary text-primary bg-white hover:bg-primary hover:text-primary-foreground transition-all shadow-none"
                 >
                   Lihat Detail
                 </Button>
@@ -912,11 +1001,11 @@ export default function SafeCommute() {
       {/* top right filter toggles */}
       {mobileStep === "map" && (
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
-        <Button type="button" variant="outline" size="xs" onClick={() => setShowSafePoints(!showSafePoints)}
+        <Button type="button" variant="secondary" size="xs" onClick={() => setShowSafePoints(!showSafePoints)}
           className={`rounded-full shadow-lg backdrop-blur-md transition-all ${showSafePoints ? "bg-sky-500 text-white border-sky-600 shadow-sky-500/20 hover:bg-sky-600 hover:text-white" : "bg-white/90 text-muted-foreground border-input"}`}>
           <ShieldCheck className="w-3.5 h-3.5" /><span>Safe Points ({safePoints.length})</span>
         </Button>
-        <Button type="button" variant="outline" size="xs" onClick={() => setShowRiskZones(!showRiskZones)}
+        <Button type="button" variant="secondary" size="xs" onClick={() => setShowRiskZones(!showRiskZones)}
           className={`rounded-full shadow-lg backdrop-blur-md transition-all ${showRiskZones ? "bg-rose-600 text-white border-rose-700 shadow-rose-600/20 hover:bg-rose-700 hover:text-white" : "bg-white/90 text-muted-foreground border-input"}`}>
           <AlertTriangle className="w-3.5 h-3.5" /><span>Zona Rawan ({riskZones.length})</span>
         </Button>
@@ -940,8 +1029,8 @@ export default function SafeCommute() {
         {isNavigating && activeRoute ? (
           <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <div className="bg-white border border-input rounded-2xl p-3 space-y-2">
-              <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0"><ArrowUp className="w-3 h-3 stroke-[3]" /></div><p className="text-sm font-medium text-foreground truncate">{originText}</p></div>
-              <div className="flex items-center gap-2"><div className="relative w-5 h-5 rounded-full bg-[#db2777] shrink-0"><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" /></div><p className="text-sm font-medium text-foreground truncate">{destinationText}</p></div>
+              <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0"><ArrowUp className="w-3 h-3 stroke-[3]" /></div><p className="text-sm font-medium text-foreground truncate">{originText}</p></div>
+              <div className="flex items-center gap-2"><div className="relative w-5 h-5 rounded-full bg-primary shrink-0"><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" /></div><p className="text-sm font-medium text-foreground truncate">{destinationText}</p></div>
             </div>
             <div className="bg-primary px-3 py-1.5 text-primary-foreground flex items-center justify-between text-xs font-semibold rounded-xl">
               <span className="truncate">Ikuti rute menuju tujuan</span>
@@ -955,11 +1044,11 @@ export default function SafeCommute() {
             <div className="bg-white border border-input rounded-2xl p-3 shadow-xs space-y-2">
               <PlaceSearchInput value={originText} onChange={(val) => { setOriginText(val); setOriginCoords(null) }} onSelectPlace={handleSelectOriginPlace}
                 placeholder="Cari lokasi jemput / titik awal..."
-                icon={<div className="w-6 h-6 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0 shadow-2xs"><ArrowUp className="w-3.5 h-3.5 stroke-[3]" /></div>} />
+                icon={<div className="w-6 h-6 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0 shadow-2xs"><ArrowUp className="w-3.5 h-3.5 stroke-[3]" /></div>} />
               <div className="relative h-px mx-1"><div className="absolute left-[30px] right-0 top-0 h-px bg-border/80" /><div className="absolute left-[6.5px] top-1/2 -translate-y-1/2 flex flex-col gap-0.5 items-center justify-center z-10 pointer-events-none"><div className="w-[3px] h-[3px] rounded-full bg-muted-foreground/50 shrink-0" /><div className="w-[3px] h-[3px] rounded-full bg-muted-foreground/50 shrink-0" /><div className="w-[3px] h-[3px] rounded-full bg-muted-foreground/50 shrink-0" /></div></div>
               <PlaceSearchInput value={destinationText} onChange={(val) => { setDestinationText(val); setDestinationCoords(null) }} onSelectPlace={handleSelectDestPlace}
                 placeholder="Cari lokasi tujuan perjalanan..."
-                icon={<div className="relative w-6 h-6 rounded-full bg-[#db2777] shrink-0 shadow-2xs"><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" /></div>} />
+                icon={<div className="relative w-6 h-6 rounded-full bg-primary shrink-0 shadow-2xs"><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" /></div>} />
             </div>
             {/* GPS + time + mode */}
             <div className="flex flex-wrap items-center gap-2">
@@ -967,12 +1056,25 @@ export default function SafeCommute() {
                 {isDetectingGps ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" /> : <LocateFixed className="w-3.5 h-3.5 text-primary" />}<span>Lokasi Saya</span>
               </button>
               <TimePicker value={departureTime} onChange={(val) => handleTimeChange(val)} showSuffix={false} triggerClassName="h-[30px] px-3 rounded-full border border-input bg-white text-xs font-semibold text-foreground shadow-2xs gap-1.5 hover:bg-muted/30 w-auto" />
-              <div className="flex items-center h-[30px] bg-muted/70 p-0.5 rounded-full border border-input">
+              {/* pilihan mode desktop */}
+              <div className="flex items-center h-[30px] bg-muted/60 p-0.5 rounded-full border border-input">
                 {TRAVEL_MODES.map((mode) => {
                   const isSelected = travelMode === mode.id
                   return (
-                    <button key={mode.id} type="button" onClick={() => handleModeChange(mode.id)} className={`h-full px-2 rounded-full transition-all flex items-center justify-center ${isSelected ? "bg-primary text-primary-foreground shadow-xs font-semibold" : "text-muted-foreground hover:bg-muted"}`} title={mode.label}>
-                      {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}{mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}{mode.id === "car" && <Car className="w-3.5 h-3.5" />}
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => handleModeChange(mode.id)}
+                      className={`h-full px-2 rounded-full transition-all flex items-center justify-center ${
+                        isSelected
+                          ? "bg-white text-primary shadow-2xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title={mode.label}
+                    >
+                      {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
+                      {mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}
+                      {mode.id === "car" && <Car className="w-3.5 h-3.5" />}
                     </button>
                   )
                 })}
@@ -1013,7 +1115,7 @@ export default function SafeCommute() {
                 const isPink = !route.isBlankSpot && route.safetyScore >= 80
                 const bgClass = isPink ? "bg-[#FCCADC] text-[#83004B]" : "bg-[#F8DA9D] text-[#584400]"
                 return (
-                  <div key={route.id} onClick={() => setSelectedRouteId(route.id)} className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-2 select-none ${isSelected ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30" : "border-input bg-white hover:bg-muted/30"}`}>
+                  <div key={route.id} onClick={() => setSelectedRouteId(route.id)} className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-2 select-none ${isSelected ? "border-primary bg-primary/[0.03] shadow-xs ring-1 ring-primary/20" : "border-input bg-white hover:bg-muted/30"}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-semibold shrink-0 ${bgClass}`}>
@@ -1043,11 +1145,11 @@ export default function SafeCommute() {
         )}
         {/* desktop bottom action bar */}
         <div className="p-3 border-t border-border/60 bg-white flex items-center gap-2">
-          <Button type="button" variant="outline" size="pill" onClick={handleShareTracking} className="flex-shrink-0" title="Protected Trip">
-            <Share2 className="w-4 h-4 text-black" /><span>Protected Trip</span>
+          <Button type="button" variant="secondary" onClick={handleStartNavigation} className="flex-shrink-0" title={isNavigating ? "Matikan Navigasi" : "Mulai Navigasi"}>
+            {isNavigating ? <><Square className="w-4 h-4 text-black" /><span>Matikan Navigasi</span></> : <><Navigation className="w-4 h-4 text-black" /><span>Mulai Navigasi</span></>}
           </Button>
-          <Button type="button" variant="pill" size="pill" onClick={handleStartNavigation} className="flex-1 w-full">
-            {isNavigating ? <><Square className="w-4 h-4" /><span>Matikan Navigasi</span></> : <><Navigation className="w-4 h-4" /><span>Mulai Navigasi</span></>}
+          <Button type="button" variant="primary" onClick={handleGoToProtectedTrip} className="flex-1 w-full" title="Protected Trip">
+            <Share2 className="w-4 h-4" /><span>Aktifkan Protected Trip</span>
           </Button>
         </div>
       </aside>
@@ -1061,11 +1163,11 @@ export default function SafeCommute() {
           <div onClick={() => setIsMobileSearchOpen(true)} className="bg-white/95 backdrop-blur-md rounded-2xl border border-input shadow-lg overflow-hidden cursor-pointer">
             <div className="p-3 space-y-1.5">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0"><ArrowUp className="w-2.5 h-2.5 stroke-[3]" /></div>
+                <div className="w-4 h-4 rounded-full bg-[#ffa2cf] flex items-center justify-center text-white shrink-0"><ArrowUp className="w-2.5 h-2.5 stroke-[3]" /></div>
                 <p className="text-sm font-medium text-foreground truncate">{originText}</p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-[#db2777] flex items-center justify-center text-white shrink-0"><div className="w-1.5 h-1.5 rounded-full bg-white" /></div>
+                <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-white shrink-0"><div className="w-1.5 h-1.5 rounded-full bg-white" /></div>
                 <p className="text-sm font-medium text-foreground truncate">{destinationText}</p>
               </div>
             </div>
@@ -1084,24 +1186,32 @@ export default function SafeCommute() {
           </div>
           <div style={{ maxHeight: sheetState === "minimized" ? "0px" : dragOffset > 0 ? `${Math.max(0, 320 - dragOffset)}px` : sheetState === "expanded" && hasExtraContent ? "60vh" : "320px", opacity: sheetState === "minimized" ? 0 : dragOffset > 0 ? Math.max(0, 1 - dragOffset / 120) : 1 }}
             className={`overflow-y-auto px-4 space-y-3 ${dragOffset > 0 ? "" : "transition-all duration-300 ease-out"} ${sheetState === "minimized" ? "pointer-events-none pb-0" : "pb-2"}`}>
-            {/* travel mode tabs */}
-            <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+            {/* travel mode tabs mobile */}
+            <div className="flex items-center justify-center gap-6 border-b border-border/60 pb-1">
               {TRAVEL_MODES.map((mode) => {
                 const isSelected = travelMode === mode.id
                 return (
-                  <button key={mode.id} type="button" onClick={() => handleModeChange(mode.id)} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold transition-all ${isSelected ? "bg-primary text-primary-foreground shadow-xs" : "text-muted-foreground hover:bg-muted"}`}>
-                    {mode.id === "walking" && <Footprints className="w-3 h-3" />}{mode.id === "motorcycle" && <Bike className="w-3 h-3" />}{mode.id === "car" && <Car className="w-3 h-3" />}<span>{mode.label}</span>
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => handleModeChange(mode.id)}
+                    className={`flex items-center gap-1.5 pb-2 text-sm font-semibold transition-all bg-transparent ${
+                      isSelected
+                        ? "text-primary border-b-2 border-primary -mb-px"
+                        : "text-muted-foreground border-b-2 border-transparent -mb-px"
+                    }`}
+                  >
+                    {mode.id === "walking" && <Footprints className="w-3.5 h-3.5" />}
+                    {mode.id === "motorcycle" && <Bike className="w-3.5 h-3.5" />}
+                    {mode.id === "car" && <Car className="w-3.5 h-3.5" />}
+                    <span>{mode.label}</span>
                   </button>
                 )
               })}
             </div>
 
             {isNavigating && activeRoute ? (
-              <div className="space-y-4">
-                <div className="bg-white border border-input rounded-2xl p-3 space-y-2">
-                  <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-foreground)] shrink-0"><ArrowUp className="w-3 h-3 stroke-[3]" /></div><p className="text-sm font-medium text-foreground truncate">{originText}</p></div>
-                  <div className="flex items-center gap-2"><div className="relative w-5 h-5 rounded-full bg-[#db2777] shrink-0"><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" /></div><p className="text-sm font-medium text-foreground truncate">{destinationText}</p></div>
-                </div>
+              <div className="space-y-3">
                 <div className="bg-primary px-3 py-1.5 text-primary-foreground flex items-center justify-between text-xs font-semibold rounded-xl">
                   <span className="truncate">Ikuti rute menuju tujuan</span>
                   <span className="bg-background/20 text-primary-foreground border-transparent text-[11px] px-2 py-0.5 rounded-full">{activeRoute.duration} • {activeRoute.distance}</span>
@@ -1116,7 +1226,7 @@ export default function SafeCommute() {
                     const isPink = !route.isBlankSpot && route.safetyScore >= 80
                     const bgClass = isPink ? "bg-[#FCCADC] text-[#83004B]" : "bg-[#F8DA9D] text-[#584400]"
                     return (
-                      <div key={route.id} onClick={() => setSelectedRouteId(route.id)} className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 select-none ${isSelected ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30" : "border-input bg-white hover:bg-muted/30"}`}>
+                      <div key={route.id} onClick={() => setSelectedRouteId(route.id)} className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 select-none ${isSelected ? "border-primary bg-primary/[0.03] shadow-xs ring-1 ring-primary/20" : "border-input bg-white hover:bg-muted/30"}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-semibold shrink-0 ${bgClass}`}>
@@ -1143,11 +1253,11 @@ export default function SafeCommute() {
 
           {/* bottom action bar */}
           <div className="p-3 border-t border-border/60 bg-white shrink-0 flex items-center gap-2.5 shadow-lg">
-            <button type="button" onClick={handleShareTracking} className="py-3 px-3.5 rounded-2xl border border-input bg-muted/40 hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs">
-              <Share2 className="w-4 h-4 text-primary" /><span>Protected Trip</span>
+            <button type="button" onClick={handleStartNavigation} className="py-3 px-3.5 rounded-2xl border border-input bg-muted/40 hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+              {isNavigating ? <><Square className="w-4 h-4 text-primary" /><span>Matikan</span></> : <><Navigation className="w-4 h-4 text-primary" /><span>Mulai Navigasi</span></>}
             </button>
-            <button type="button" onClick={handleStartNavigation} className="flex-1 py-3 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all select-none">
-              {isNavigating ? <><Square className="w-4 h-4" /><span>Matikan Navigasi</span></> : <><Navigation className="w-4 h-4" /><span>Mulai Navigasi</span></>}
+            <button type="button" onClick={handleGoToProtectedTrip} className="flex-1 py-3 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all select-none">
+              <Share2 className="w-4 h-4" /><span>Aktifkan Protected Trip</span>
             </button>
           </div>
         </div>
@@ -1169,3 +1279,51 @@ export default function SafeCommute() {
     </div>
   )
 }
+
+// interpolasi titik-titik lingkaran sempurna berbasis piksel layar konstan
+function generateScreenSpaceDots(coordinates, map, pixelSpacing = 20) {
+  if (!coordinates || coordinates.length < 2 || !map || typeof map.project !== "function") {
+    return { type: "FeatureCollection", features: [] }
+  }
+
+  const features = []
+  let leftover = 0
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const c1 = coordinates[i]
+    const c2 = coordinates[i + 1]
+    const p1 = map.project(c1)
+    const p2 = map.project(c2)
+
+    const dx = p2.x - p1.x
+    const dy = p2.y - p1.y
+    const segPixelDist = Math.sqrt(dx * dx + dy * dy)
+
+    if (segPixelDist <= 0) continue
+
+    let dist = leftover > 0 ? leftover : 0
+    while (dist <= segPixelDist) {
+      const t = dist / segPixelDist
+      const x = p1.x + dx * t
+      const y = p1.y + dy * t
+      const unprojected = map.unproject([x, y])
+
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Point",
+          coordinates: [unprojected.lng, unprojected.lat],
+        },
+      })
+      dist += pixelSpacing
+    }
+    leftover = dist - segPixelDist
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  }
+}
+
