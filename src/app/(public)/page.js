@@ -1,15 +1,22 @@
-"use client"
-
 import React from "react"
-import AnonymousReport from "@/features/report/components/anonymous-report"
+import { Navbar } from "@/features/landing/components/navbar"
+import { HeroSection } from "@/features/landing/components/hero-section"
+import { FeaturesSection } from "@/features/landing/components/features-section"
+import { HowItWorksSection } from "@/features/landing/components/how-it-works-section"
+import { AboutSection } from "@/features/landing/components/about-section"
+import { FooterSection } from "@/features/landing/components/footer-section"
 
 export default function Home() {
   return (
-    <main className="min-h-screen w-full bg-background flex flex-col items-center justify-start">
-      {/* konten fitur laporan anonim */}
-      <div className="w-full flex-1 flex flex-col">
-        <AnonymousReport />
-      </div>
-    </main>
+    <>
+      <Navbar />
+      <main className="min-h-screen w-full bg-background flex flex-col items-center justify-start">
+        <HeroSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <AboutSection />
+        <FooterSection />
+      </main>
+    </>
   )
 }
