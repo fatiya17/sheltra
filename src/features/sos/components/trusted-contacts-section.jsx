@@ -94,7 +94,7 @@ export function TrustedContactsSection({
         {/* tombol tambah kontak */}
         {!readOnly && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="xs"
             onClick={handleOpenAdd}
             disabled={contacts.length >= 5}
