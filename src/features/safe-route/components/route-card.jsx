@@ -22,7 +22,7 @@ export function RouteCard({ route, isSelected, onSelect }) {
       className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 relative select-none ${
         isSelected
           ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-          : "border-input bg-card hover:bg-muted/30 text-card-foreground"
+          : "border-input bg-white hover:bg-muted/30 text-card-foreground"
       }`}
     >
       {/* header rute & badge */}
