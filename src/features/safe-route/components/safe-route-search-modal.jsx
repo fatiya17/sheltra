@@ -148,7 +148,7 @@ export function SafeRouteSearchModal({
 
   // --- Render Elements ---
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       {/* card modal responsif */}
       <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg bg-white sm:rounded-3xl sm:border sm:border-input shadow-2xl overflow-hidden flex flex-col">
         

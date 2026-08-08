@@ -92,11 +92,11 @@ export default function ProtectedTripFlow() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-between select-none">
+    <div className="min-h-screen bg-white flex flex-col justify-between select-none pb-20 md:pb-8">
       {/* header navbar */}
       <Navbar />
 
-      <main className="flex-1 max-w-md w-full mx-auto px-5 py-6 flex flex-col justify-between">
+      <main className="flex-1 max-w-md w-full mx-auto px-5 py-6 pb-20 md:pb-6 flex flex-col justify-between">
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* STAGE 1: ACTIVE PROTECTED TRIP */}
         {/* ════════════════════════════════════════════════════════════════ */}

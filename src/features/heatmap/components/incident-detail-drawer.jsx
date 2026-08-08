@@ -186,7 +186,7 @@ export function IncidentDetailDrawer({
         </div>
 
         {/* FOOTER */}
-        <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-3">
+        <div className="border-t border-gray-100 bg-gray-50/50 px-5 pt-3 pb-8 sm:py-3">
           <div className="flex gap-2.5">
             <button
               onClick={onClose}

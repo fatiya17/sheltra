@@ -1,6 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/features/auth/context/auth-context";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -27,12 +29,15 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
-        <ToastProvider>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <TooltipProvider>
+              {children}
+              <MobileBottomNav />
+            </TooltipProvider>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );
-}
+}

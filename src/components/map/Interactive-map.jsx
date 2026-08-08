@@ -638,7 +638,7 @@ export default function InteractiveMap({ onLocationSelect }) {
 
       {/* BOTTOM FLOATING SHEET (DRAWER): Clean Route Details Only */}
       {!showTokenPrompt && routeDistance && (
-        <div className="absolute bottom-4 left-4 right-4 md:left-6 md:w-[420px] md:right-auto md:bottom-6 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md p-4 rounded-3xl border border-slate-200/60 dark:border-slate-850 shadow-2xl flex flex-col gap-3 pointer-events-auto">
+        <div className="absolute bottom-20 left-4 right-4 md:left-6 md:w-[420px] md:right-auto md:bottom-6 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md p-4 rounded-3xl border border-slate-200/60 dark:border-slate-850 shadow-2xl flex flex-col gap-3 pointer-events-auto">
           <div className="p-3.5 bg-primary/10 rounded-2xl flex flex-col gap-1.5 border border-primary/20">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className="text-slate-700 dark:text-slate-300">Estimasi Jarak</span>

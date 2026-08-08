@@ -634,7 +634,7 @@ export default function SafeCommute() {
   // ════════════════════════════════════════════════════════════════════
   const renderFlowScreen = () => {
     if (mobileStep === "home") return (
-      <div className="h-full overflow-y-auto w-full bg-white flex flex-col">
+      <div className="h-full overflow-y-auto w-full bg-white flex flex-col pb-20">
         {/* pink gradient header */}
         <div className="bg-gradient-to-b from-[#e8195a] to-[#f43f7a] text-white pt-10 pb-16 px-5 relative overflow-hidden rounded-b-[36px]">
           <div className="absolute top-0 right-0 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
@@ -949,17 +949,16 @@ export default function SafeCommute() {
           </div>
 
           {/* route cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {recommendationRoutes.map((route, idx) => (
-            <div key={route.id} className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden">
+            <div key={route.id} className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col justify-between">
               {/* card header row */}
               <div className="px-4 pt-4 pb-3 space-y-2">
-                {/* "Disarankan" badge — sits above title row */}
-                {route.recommended && (
-                  <Badge variant="green" className="text-[11px] font-bold px-2.5 gap-1.5 mb-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-600 inline-block shrink-0" />
-                    Disarankan
-                  </Badge>
-                )}
+                {/* "Disarankan" badge — invisible on desktop if not recommended to preserve alignment */}
+                <Badge variant="green" className={`text-[11px] font-bold px-2.5 gap-1.5 ${route.recommended ? "mb-4" : "hidden md:inline-flex md:invisible md:mb-4"}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-600 inline-block shrink-0" />
+                  Disarankan
+                </Badge>
 
                 {/* title + risk badge on same row */}
                 <div className="flex items-center justify-between gap-2">
@@ -968,7 +967,7 @@ export default function SafeCommute() {
                     variant={route.riskLabel === "Risiko Rendah" ? "pink" : route.riskLabel === "Risiko Sedang" ? "yellow" : "red"}
                     className="text-[11px] font-semibold px-3 h-6 shrink-0"
                   >
-                    {route.riskLabel}
+                    {route.riskLabel === "Risiko Rendah" ? `Aman ${route.safetyScore}%` : route.riskLabel === "Risiko Sedang" ? `Sedang ${route.safetyScore}%` : `Bahaya ${route.safetyScore}%`}
                   </Badge>
                 </div>
 
@@ -1011,6 +1010,7 @@ export default function SafeCommute() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       </div>
     )
@@ -1032,19 +1032,7 @@ export default function SafeCommute() {
         </div>
       )}
 
-      {/* top right filter toggles */}
-      {mobileStep === "map" && (
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
-        <Button type="button" variant="secondary" size="xs" onClick={() => setShowSafePoints(!showSafePoints)}
-          className={`rounded-full shadow-lg backdrop-blur-md transition-all ${showSafePoints ? "bg-sky-500 text-white border-sky-600 shadow-sky-500/20 hover:bg-sky-600 hover:text-white" : "bg-white/90 text-muted-foreground border-input"}`}>
-          <ShieldCheck className="w-3.5 h-3.5" /><span>Safe Points ({safePoints.length})</span>
-        </Button>
-        <Button type="button" variant="secondary" size="xs" onClick={() => setShowRiskZones(!showRiskZones)}
-          className={`rounded-full shadow-lg backdrop-blur-md transition-all ${showRiskZones ? "bg-rose-600 text-white border-rose-700 shadow-rose-600/20 hover:bg-rose-700 hover:text-white" : "bg-white/90 text-muted-foreground border-input"}`}>
-          <AlertTriangle className="w-3.5 h-3.5" /><span>Zona Rawan ({riskZones.length})</span>
-        </Button>
-      </div>
-      )}
+
 
       {/* back to recommendations button (mobile) */}
       {mobileStep === "map" && (
@@ -1157,7 +1145,13 @@ export default function SafeCommute() {
                         </div>
                         <div><p className="text-[13px] font-semibold text-foreground">{route.title}</p><p className="text-xs text-muted-foreground">{route.duration} • {route.distance}</p></div>
                       </div>
-                      {route.isBlankSpot ? <Badge variant="yellow">Data Terbatas</Badge> : route.safetyScore >= 80 ? <Badge variant="pink">Skor {route.safetyScore}/100</Badge> : <Badge variant="yellow">Skor {route.safetyScore}/100</Badge>}
+                      {route.isBlankSpot ? (
+                        <Badge variant="yellow">Data Terbatas</Badge>
+                      ) : (
+                        <Badge variant={route.safetyScore >= 80 ? "pink" : "yellow"}>
+                          {route.safetyScore >= 80 ? `Aman ${route.safetyScore}%` : `Sedang ${route.safetyScore}%`}
+                        </Badge>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40 text-xs">
                       <div className="flex items-center gap-1.5 text-muted-foreground"><Sun className="w-3 h-3 text-amber-500" /><span>Penerangan {route.lightingScore}%</span></div>
@@ -1213,7 +1207,7 @@ export default function SafeCommute() {
         </div>
 
         {/* bottom draggable sheet */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 bg-white/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
+        <div className="absolute bottom-[60px] md:bottom-0 left-0 right-0 z-30 bg-white/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
           <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onMouseDown={handleMouseDown}
             className="w-full py-2.5 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none shrink-0">
             <div className="w-12 h-1.5 rounded-full bg-muted-foreground/40 hover:bg-muted-foreground/60 transition-colors" />

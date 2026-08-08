@@ -273,7 +273,7 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved, defaultCategory = 
               <EvidenceUpload evidence={evidence} onEvidenceChange={setEvidence} />
             </div>
 
-            <div className="pt-4 mt-auto">
+            <div className="pt-4 mt-auto pb-20 md:pb-6">
               <Button type="submit" variant="primary" className="w-full h-12 text-base rounded-xl">
                 Kirim Laporan Anonim
               </Button>

@@ -97,7 +97,7 @@ function SelectTrigger({ className, children, id, ...props }) {
       id={id}
       onClick={() => setIsOpen(!isOpen)}
       className={cn(
-        "flex w-full items-center justify-between rounded-xl border border-[#DFE5EE] dark:border-slate-800 bg-[#FDFDFE] dark:bg-transparent py-3 px-4 text-sm text-slate-800 dark:text-slate-200 transition-colors outline-none select-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black dark:focus:border-white dark:focus:ring-white disabled:cursor-not-allowed disabled:opacity-50 text-left aria-invalid:border-red-500 aria-invalid:focus:border-black aria-invalid:focus:ring-black dark:aria-invalid:focus:border-white dark:aria-invalid:focus:ring-white",
+        "flex w-full items-center justify-between rounded-xl border border-[#DFE5EE] dark:border-slate-800 bg-[#FDFDFE] dark:bg-transparent py-3 px-4 text-sm text-slate-800 dark:text-slate-200 transition-colors outline-none select-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:focus:border-primary dark:focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-left aria-invalid:border-red-500 aria-invalid:focus:border-red-500 aria-invalid:focus:ring-red-500",
         className
       )}
       {...props}

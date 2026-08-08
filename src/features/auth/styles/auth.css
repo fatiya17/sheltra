@@ -57,7 +57,7 @@
 .remember-me-checkbox {
   width: 18px;
   height: 18px;
-  accent-color: #ec4899;
+  accent-color: var(--primary, #F02E65);
   cursor: pointer;
 }
 
@@ -70,14 +70,15 @@
 
 .forgot-link {
   font-size: 14px;
-  color: #ec4899;
+  color: var(--primary, #F02E65);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s ease;
 }
 
 .forgot-link:hover {
-  color: #db2777;
+  color: #d61f53;
+  text-decoration: underline;
 }
 
 .social-text {
@@ -135,14 +136,15 @@
 }
 
 .login-link {
-  color: #ec4899;
+  color: var(--primary, #F02E65);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
   transition: color 0.2s ease;
 }
 
 .login-link:hover {
-  color: #db2777;
+  color: #d61f53;
+  text-decoration: underline;
 }
 
 @media (min-width: 640px) {

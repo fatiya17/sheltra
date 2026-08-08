@@ -25,7 +25,7 @@ export default function DraftsPage() {
         className="bg-white"
       />
       
-      <div className="flex-1 px-4 py-6 space-y-4 max-w-2xl mx-auto w-full">
+      <div className="flex-1 px-4 py-6 pb-24 md:pb-6 space-y-4 max-w-2xl mx-auto w-full">
         {pendingReports.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-slate-500">
             <p>Tidak ada draft laporan tersimpan.</p>

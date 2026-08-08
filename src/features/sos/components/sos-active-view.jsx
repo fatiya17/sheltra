@@ -716,7 +716,7 @@ export function SosActiveView({
           )}
 
           {/* bottom draggable sheet — percis safe-route */}
-          <div ref={mobileSheetRef} className="absolute bottom-0 left-0 right-0 z-30 bg-white/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
+          <div ref={mobileSheetRef} className="absolute bottom-[60px] md:bottom-0 left-0 right-0 z-30 bg-white/98 backdrop-blur-xl border-t border-input rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
             {/* drag handle */}
             <div
               onTouchStart={handleTouchStart}
@@ -877,7 +877,7 @@ export function SosActiveView({
   return (
     <>
       {/* MOBILE: full-screen layout */}
-      <div className="flex flex-col lg:hidden min-h-[calc(100vh-2rem)] bg-white">
+      <div className="flex flex-col lg:hidden min-h-[calc(100vh-2rem)] bg-white pb-24">
         {/* header banner */}
         <div className="-mx-4 -mt-4 bg-[#e62058] text-white px-4 py-3.5 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">

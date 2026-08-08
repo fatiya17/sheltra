@@ -317,7 +317,7 @@ export function RouteMap({
       </div>
 
       {/* legenda peta */}
-      <div className="absolute bottom-3 left-3 right-3 md:right-auto bg-background/90 backdrop-blur-md border border-input rounded-lg p-2 text-xs flex flex-wrap items-center gap-3 shadow-md z-10">
+      <div className="absolute bottom-20 md:bottom-3 left-3 right-3 md:right-auto bg-background/90 backdrop-blur-md border border-input rounded-lg p-2 text-xs flex flex-wrap items-center gap-3 shadow-md z-10">
         <div className="flex items-center gap-1">
           <span className="w-3 h-1 bg-emerald-500 rounded-full" />
           <span>Rute Teraman</span>

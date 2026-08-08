@@ -55,7 +55,7 @@ export default function EditDraftPage() {
   }
 
   return (
-    <div className="w-full flex flex-col min-h-screen bg-white md:max-w-2xl md:mx-auto">
+    <div className="w-full flex flex-col min-h-screen bg-white md:max-w-2xl md:mx-auto pb-20 md:pb-8">
       {step === "form" && (
         <>
           <MobileHeader 

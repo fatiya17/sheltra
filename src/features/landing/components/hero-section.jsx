@@ -7,7 +7,7 @@ import { ShieldCheck, Search } from "lucide-react";
 
 export function HeroSection() {
   return (
-    <section className="relative w-full py-6 md:py-14 lg:py-20 bg-white overflow-hidden">
+    <section id="hero" className="relative w-full py-6 md:py-14 lg:py-20 bg-white overflow-hidden">
       <div className="container px-4 md:px-10 lg:px-16 mx-auto">
         <div className="grid gap-4 sm:gap-8 grid-cols-5 md:grid-cols-12 items-center">
 

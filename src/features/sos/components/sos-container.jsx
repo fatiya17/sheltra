@@ -114,7 +114,7 @@ export default function SosContainer() {
   // 2. TAMPILAN SIAGA SOS (IDLE)
   // =========================================================================
   return (
-    <div className="w-full p-4 md:px-8 md:py-6 flex items-center min-h-[80vh] lg:min-h-[70vh]">
+    <div className="w-full p-4 md:px-8 md:py-6 flex items-center min-h-[80vh] lg:min-h-[70vh] pb-24 md:pb-6">
       {/* 
         Layout Desktop: 3 kolom — bantuan cepat, tombol SOS, titik aman.
         Layout Mobile: hanya tombol SOS (panel samping disembunyikan)

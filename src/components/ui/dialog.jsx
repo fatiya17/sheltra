@@ -67,7 +67,7 @@ function DialogPortal({ children }) {
   if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {children}
     </div>,
     document.body

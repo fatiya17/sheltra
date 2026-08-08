@@ -614,11 +614,11 @@ export function InteractiveHeatmap() {
         </div>
 
         {/* floating bottom card legenda risiko di mobile */}
-        <div className="mt-auto w-full max-w-lg mx-auto pointer-events-auto flex flex-col items-end gap-3">
+        <div className="mt-auto w-full max-w-lg mx-auto pointer-events-auto flex flex-col items-end gap-2.5 pb-24">
           <button
             type="button"
-            onClick={() => router.push("/")}
-            className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-transform active:scale-95"
+            onClick={() => router.push("/anonymous-report")}
+            className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-transform active:scale-95 hover:bg-primary/90"
             title="Laporkan Insiden"
           >
             <Plus className="w-6 h-6" />

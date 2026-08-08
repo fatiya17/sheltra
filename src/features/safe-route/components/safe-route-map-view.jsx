@@ -547,7 +547,7 @@ export function SafeRouteMapView({
       </div>
 
       {/* BOTTOM SHEET / SIDE PANEL (RESPONSIF) */}
-      <div className="absolute bottom-0 md:bottom-6 left-0 right-0 md:left-6 md:right-auto md:w-[420px] z-30 bg-white/98 backdrop-blur-xl border-t md:border border-input md:rounded-3xl rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
+      <div className="absolute bottom-[60px] md:bottom-6 left-0 right-0 md:left-6 md:right-auto md:w-[420px] z-30 bg-white/98 backdrop-blur-xl border-t md:border border-input md:rounded-3xl rounded-t-[28px] shadow-2xl flex flex-col pointer-events-auto overflow-hidden">
         {/* drag handle bar (hanya tampil di mobile) */}
         <div
           onTouchStart={handleTouchStart}

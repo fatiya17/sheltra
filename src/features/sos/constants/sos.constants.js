@@ -8,7 +8,7 @@ export const DEFAULT_TRUSTED_CONTACTS = [
     avatarBg: "bg-sky-100 text-sky-700 border-sky-300",
     badgeColor: "bg-emerald-500",
     avatarInitial: "AZ",
-    avatarImage: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
+    avatarImage: "https://api.dicebear.com/7.x/lorelei/svg?seed=Alzea&backgroundColor=ffe4e6",
     isPrimary: true,
   },
   {
@@ -19,7 +19,7 @@ export const DEFAULT_TRUSTED_CONTACTS = [
     avatarBg: "bg-emerald-100 text-emerald-700 border-emerald-300",
     badgeColor: "bg-emerald-500",
     avatarInitial: "YF",
-    avatarImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    avatarImage: "https://api.dicebear.com/7.x/lorelei/svg?seed=Yafie&backgroundColor=e0f2fe",
     isPrimary: false,
   },
   {
@@ -30,7 +30,7 @@ export const DEFAULT_TRUSTED_CONTACTS = [
     avatarBg: "bg-pink-100 text-pink-700 border-pink-300",
     badgeColor: "bg-emerald-500",
     avatarInitial: "SL",
-    avatarImage: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+    avatarImage: "https://api.dicebear.com/7.x/lorelei/svg?seed=Sally&backgroundColor=ffd5dc",
     isPrimary: false,
   },
 ]

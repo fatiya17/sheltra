@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 
 export function AboutSection() {
   return (
-    <section className="w-full py-8 md:py-20 bg-primary text-primary-foreground overflow-hidden">
+    <section id="about" className="w-full py-8 md:py-20 bg-primary text-primary-foreground overflow-hidden">
       <div className="container px-4 md:px-10 lg:px-16 mx-auto">
         <div className="grid gap-4 sm:gap-10 grid-cols-2 items-center">
 
