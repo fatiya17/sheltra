@@ -13,7 +13,7 @@ const Login = () => {
   const { login } = useAuth();
 
   // default value biar bisa langsung login tanpa ngetik
-  const [identifier, setIdentifier] = useState('fatiya.khairina@sheltra.id');
+  const [identifier, setIdentifier] = useState('group1@sheltra.com');
   const [password, setPassword] = useState('password123');
   const [errors, setErrors] = useState({});
 
