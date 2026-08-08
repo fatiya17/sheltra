@@ -12,8 +12,9 @@ const Login = () => {
   const redirectPath = searchParams.get('redirect') || '/safe-route';
   const { login } = useAuth();
 
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  // default value biar bisa langsung login tanpa ngetik
+  const [identifier, setIdentifier] = useState('fatiya.khairina@sheltra.id');
+  const [password, setPassword] = useState('password123');
   const [errors, setErrors] = useState({});
 
   // validasi form login
