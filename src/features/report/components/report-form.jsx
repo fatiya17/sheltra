@@ -76,6 +76,40 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved, defaultCategory = 
     },
   })
 
+  // load saved draft dari localstorage saat mount jika draftData tidak ada
+  React.useEffect(() => {
+    if (draftData || typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_report_draft")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed.category) form.setValue("category", parsed.category)
+        if (parsed.location) form.setValue("location", parsed.location)
+        if (parsed.time) form.setValue("time", parsed.time)
+        if (parsed.description) form.setValue("description", parsed.description)
+        if (parsed.evidence) setEvidence(parsed.evidence)
+      }
+    } catch (e) {
+      console.warn("Gagal membaca report draft dari localStorage:", e)
+    }
+  }, [draftData, form])
+
+  // simpan draft ke localstorage saat field berubah
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const subscription = form.watch((value) => {
+      try {
+        localStorage.setItem(
+          "sheltra_report_draft",
+          JSON.stringify({ ...value, evidence })
+        )
+      } catch (e) {
+        console.warn("Gagal menyimpan report draft:", e)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form, evidence])
+
   // handler submit form
   const onSubmit = async (values) => {
     const newReport = {
@@ -87,6 +121,14 @@ export function ReportForm({ onSubmitSuccess, onOfflineSaved, defaultCategory = 
       status: "Laporan Baru (Anonim)",
       createdAt: "Baru saja",
       evidence: evidence ? { ...evidence } : null,
+    }
+
+    // hapus draft tersimpan
+    try {
+      localStorage.removeItem("sheltra_report_draft")
+      localStorage.removeItem("sheltra_anonymous_report_step")
+    } catch (e) {
+      console.warn("Gagal menghapus draft:", e)
     }
 
     // cek status offline

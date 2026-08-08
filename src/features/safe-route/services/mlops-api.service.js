@@ -1,128 +1,100 @@
-/**
- * mlops-api.service.js
- * Service client untuk mengonsumsi API MLOps Risk Score Serving (FastAPI).
- * Menyediakan integrasi endpoint /health, /meta, /risk-score, dan /risk-score/batch
- * serta Geo-Adapter untuk pemetaan koordinat Jabodetabek/Indonesia ke model feature space.
- */
+import axios from "axios"
 
+// base url api mlops
 const MLOPS_BASE_URL = process.env.NEXT_PUBLIC_MLOPS_API_URL || "http://127.0.0.1:8000"
+
+// instance axios khusus mlops
+export const mlopsClient = axios.create({
+  baseURL: MLOPS_BASE_URL,
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
+})
 
 class MlopsApiService {
   constructor() {
+    // cache metadata di memori
     this.metaCache = null
   }
 
-  /**
-   * Cek status kesiapan API MLOps & kesiapan model bundle.
-   * @returns {Promise<{status: string, model_loaded: boolean, model_version?: string}>}
-   */
+  // helper format error axios
+  _formatError(err) {
+    if (err.response?.data) {
+      const detail = err.response.data.detail
+      if (typeof detail === "string") return detail
+      if (Array.isArray(detail)) {
+        return detail.map((d) => d.msg || JSON.stringify(d)).join(", ")
+      }
+      if (detail) return JSON.stringify(detail)
+    }
+    return err.message || "Terjadi kesalahan pada layanan MLOps"
+  }
+
+  // cek health service mlops
   async checkHealth() {
     try {
-      const res = await fetch(`${MLOPS_BASE_URL}/health`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      })
-      if (!res.ok) {
-        return { status: "not_ready", model_loaded: false }
-      }
-      return await res.json()
+      const res = await mlopsClient.get("/health", { timeout: 3000 })
+      return res.data
     } catch (err) {
-      console.warn("MLOps API Health check failed (service might be offline):", err.message)
+      console.warn("mlops health check gagal:", err.message)
       return { status: "offline", model_loaded: false }
     }
   }
 
-  /**
-   * Mengambil metadata model, ambang batas level risiko, bounding box, dan disclaimer.
-   * Hasil di-cache dalam memori agar tidak melakukan request berulang pada setiap render.
-   */
+  // ambil metadata model mlops
   async getMeta(forceRefresh = false) {
     if (this.metaCache && !forceRefresh) {
       return this.metaCache
     }
 
     try {
-      const res = await fetch(`${MLOPS_BASE_URL}/meta`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      })
-      if (!res.ok) {
-        throw new Error(`Gagal mengambil metadata MLOps (Status: ${res.status})`)
-      }
-      const data = await res.json()
-      this.metaCache = data
-      return data
+      const res = await mlopsClient.get("/meta")
+      this.metaCache = res.data
+      return res.data
     } catch (err) {
-      console.error("Error fetching MLOps metadata:", err)
-      throw err
+      console.error("gagal fetch metadata mlops:", this._formatError(err))
+      throw new Error(this._formatError(err))
     }
   }
 
-  /**
-   * Prediksi skor risiko untuk 1 titik lokasi dan waktu tertentu.
-   * @param {number} lat - Lintang
-   * @param {number} lon - Bujur
-   * @param {string} datetimeISO - String format ISO 8601 (mis. "2026-04-11T23:00:00")
-   */
-  async getSingleRiskScore(lat, lon, datetimeISO) {
-    const params = new URLSearchParams({
-      lat: String(lat),
-      lon: String(lon),
-      datetime: datetimeISO,
-    })
-
-    const res = await fetch(`${MLOPS_BASE_URL}/risk-score?${params.toString()}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    })
-
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ detail: res.statusText }))
-      const message = typeof errorData.detail === "string" ? errorData.detail : JSON.stringify(errorData.detail)
-      throw new Error(message || `Error ${res.status}`)
+  // prediksi skor satu titik
+  async getSingleRiskScore(lat, lon, datetimeISO, config = {}) {
+    try {
+      const res = await mlopsClient.get("/risk-score", {
+        params: {
+          lat: Number(lat),
+          lon: Number(lon),
+          datetime: datetimeISO,
+        },
+        ...config,
+      })
+      return res.data
+    } catch (err) {
+      throw new Error(this._formatError(err))
     }
-
-    return await res.json()
   }
 
-  /**
-   * Prediksi skor risiko untuk banyak titik sekaligus (Vektorized / Batch endpoint).
-   * @param {Array<{lat: number, lon: number, datetime: string}>} points - Maks 5.000 titik.
-   */
-  async getBatchRiskScores(points) {
+  // prediksi batch multi titik
+  async getBatchRiskScores(points, config = {}) {
     if (!points || points.length === 0) {
       return { results: [] }
     }
 
-    const res = await fetch(`${MLOPS_BASE_URL}/risk-score/batch`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ points }),
-    })
-
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ detail: res.statusText }))
-      const message = Array.isArray(errorData.detail)
-        ? errorData.detail.join(", ")
-        : typeof errorData.detail === "string"
-        ? errorData.detail
-        : JSON.stringify(errorData.detail)
-      throw new Error(message || `Error ${res.status}`)
+    try {
+      const res = await mlopsClient.post(
+        "/risk-score/batch",
+        { points },
+        config
+      )
+      return res.data
+    } catch (err) {
+      throw new Error(this._formatError(err))
     }
-
-    return await res.json()
   }
 
-  /**
-   * Memeriksa apakah suatu koordinat berada di dalam bounding box yang didukung model.
-   * @param {number} lat - Lintang
-   * @param {number} lon - Bujur
-   * @param {{lat_min: number, lat_max: number, lon_min: number, lon_max: number}} bbox
-   * @returns {boolean}
-   */
+  // validasi bounding box model
   isInsideBoundingBox(lat, lon, bbox) {
     if (!bbox) return false
     return (
@@ -133,13 +105,7 @@ class MlopsApiService {
     )
   }
 
-  /**
-   * Geo-Adapter: Memetakan koordinat dari Jabodetabek/Indonesia ke dalam model bounding box
-   * agar endpoint MLOps dapat dikonsumsi secara aktif dan valid tanpa error 422.
-   * @param {number} lat
-   * @param {number} lon
-   * @param {{lat_min: number, lat_max: number, lon_min: number, lon_max: number}} bbox
-   */
+  // adapter mapping koordinat region
   mapCoordinateToModelRegion(lat, lon, bbox) {
     if (this.isInsideBoundingBox(lat, lon, bbox)) {
       return { lat, lon, isMapped: false }
@@ -150,7 +116,7 @@ class MlopsApiService {
     const targetLonMin = bbox ? bbox.lon_min + 0.04 : -87.90
     const targetLonMax = bbox ? bbox.lon_max - 0.04 : -87.55
 
-    // Bounding box area Jabodetabek
+    // bounding box area jabodetabek
     const jktLatMin = -6.45
     const jktLatMax = -6.08
     const jktLonMin = 106.65
@@ -171,3 +137,5 @@ class MlopsApiService {
 }
 
 export const mlopsApiService = new MlopsApiService()
+export { MlopsApiService }
+

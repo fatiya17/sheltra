@@ -29,6 +29,58 @@ export function useSos() {
   const holdStartTimeRef = useRef(null)
   const holdAnimFrameRef = useRef(null)
   const activeTimerRef = useRef(null)
+  const isHydratedRef = useRef(false)
+
+  // load state dari localstorage saat mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_sos_state")
+      if (raw) {
+        const saved = JSON.parse(raw)
+        if (saved.status === "active") {
+          setStatus("active")
+          if (typeof saved.activeDurationSeconds === "number") {
+            setActiveDurationSeconds(saved.activeDurationSeconds)
+          }
+          if (typeof saved.isMuted === "boolean") {
+            setIsMuted(saved.isMuted)
+          }
+          if (saved.userLocation) {
+            setUserLocation(saved.userLocation)
+          }
+          if (!saved.isMuted) {
+            sosService.startAlarm()
+            setIsAlarmPlaying(true)
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal membaca SOS state dari localStorage:", e)
+    } finally {
+      isHydratedRef.current = true
+    }
+  }, [])
+
+  // simpan state ke localstorage saat berubah
+  useEffect(() => {
+    if (typeof window === "undefined" || !isHydratedRef.current) return
+    try {
+      if (status === "active") {
+        const stateToSave = {
+          status: "active",
+          activeDurationSeconds,
+          isMuted,
+          userLocation,
+        }
+        localStorage.setItem("sheltra_sos_state", JSON.stringify(stateToSave))
+      } else {
+        localStorage.removeItem("sheltra_sos_state")
+      }
+    } catch (e) {
+      console.warn("Gagal menyimpan SOS state ke localStorage:", e)
+    }
+  }, [status, activeDurationSeconds, isMuted, userLocation])
 
   // load kontak saat pertama kali
   useEffect(() => {
@@ -105,7 +157,6 @@ export function useSos() {
   // timer durasi sos aktif
   useEffect(() => {
     if (status === "active") {
-      setActiveDurationSeconds(0)
       activeTimerRef.current = setInterval(() => {
         setActiveDurationSeconds((prev) => prev + 1)
       }, 1000)
@@ -123,6 +174,7 @@ export function useSos() {
   // pemicu aktifkan sos
   const triggerSos = useCallback(async () => {
     setStatus("active")
+    setActiveDurationSeconds(0)
     setHoldProgress(100)
 
     // getar haptic darurat

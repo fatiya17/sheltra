@@ -25,6 +25,44 @@ export default function AnonymousReport() {
   const [customCategory, setCustomCategory] = useState("")
   const [showDraftPopup, setShowDraftPopup] = useState(false)
 
+  // flag hydration localstorage
+  const isHydratedRef = React.useRef(false)
+
+  // load saved state saat mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_anonymous_report_step")
+      if (raw) {
+        const saved = JSON.parse(raw)
+        if (saved.step && saved.step !== "success" && saved.step !== "offline") setStep(saved.step)
+        if (saved.selectedCategory) setSelectedCategory(saved.selectedCategory)
+        if (saved.customCategory) setCustomCategory(saved.customCategory)
+      }
+    } catch (e) {
+      console.warn("Gagal membaca report step state:", e)
+    } finally {
+      isHydratedRef.current = true
+    }
+  }, [])
+
+  // simpan state ke localstorage saat berubah
+  useEffect(() => {
+    if (typeof window === "undefined" || !isHydratedRef.current) return
+    try {
+      if (step === "success" || step === "offline") {
+        localStorage.removeItem("sheltra_anonymous_report_step")
+      } else {
+        localStorage.setItem(
+          "sheltra_anonymous_report_step",
+          JSON.stringify({ step, selectedCategory, customCategory })
+        )
+      }
+    } catch (e) {
+      console.warn("Gagal menyimpan report step state:", e)
+    }
+  }, [step, selectedCategory, customCategory])
+
   useEffect(() => {
     const checkDrafts = async () => {
       if (offlineReportService.isOnline()) {
@@ -44,10 +82,14 @@ export default function AnonymousReport() {
   }, [])
   // handler submit berhasil
   const handleSubmitSuccess = () => {
+    localStorage.removeItem("sheltra_anonymous_report_step")
+    localStorage.removeItem("sheltra_report_draft")
     setStep("success")
   }
 
   const handleOfflineSaved = () => {
+    localStorage.removeItem("sheltra_anonymous_report_step")
+    localStorage.removeItem("sheltra_report_draft")
     setStep("offline")
   }
 

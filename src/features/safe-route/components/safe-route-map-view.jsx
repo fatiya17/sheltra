@@ -24,7 +24,85 @@ import { RiskTimeline } from "./risk-timeline"
 import { SafeRouteNavSimulation } from "./safe-route-nav-simulation"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/toast"
+import { IncidentDetailDrawer } from "@/features/heatmap/components/incident-detail-drawer"
+import { RISK_LEVELS } from "@/features/heatmap/constants/heatmap.constants"
+import { enrichHeatmapIncident } from "@/features/heatmap/services/heatmap.service"
 import "mapbox-gl/dist/mapbox-gl.css"
+
+// normalisasi zona risiko ke format hotspot heatmap
+const normalizeRiskZoneForHeatmap = (zone) => {
+  const levelStr = String(zone.riskLevel || "").toLowerCase()
+  let level = "high"
+  if (levelStr.includes("tinggi") || levelStr === "high") level = "high"
+  else if (levelStr.includes("sedang") || levelStr === "medium") level = "medium"
+  else if (levelStr.includes("rendah") || levelStr === "low") level = "low"
+  else if (levelStr.includes("aman") || levelStr === "safe") level = "safe"
+
+  const title = zone.title || zone.name || "Zona Rawan Insiden"
+  const category = zone.category || zone.reason || "Area Rawan Kejahatan"
+  const location = zone.location || zone.name || "Area Sekitar Rute"
+  const areaName = zone.areaName || zone.name?.replace(/Area |Gang |Jalur /gi, "") || "Zona Rawan"
+  const incidentCount = zone.incidentCount || zone.totalReports || 3
+  const riskScore = zone.riskScore || (level === "high" ? 85 : level === "medium" ? 65 : 35)
+
+  return {
+    ...zone,
+    id: zone.id || `rz-${title.toLowerCase().replace(/\s+/g, "-")}`,
+    title,
+    name: title,
+    category,
+    riskLevel: level,
+    location,
+    areaName,
+    incidentCount,
+    totalReports: incidentCount,
+    riskScore,
+    coordinates: zone.coordinates,
+    glowSize: zone.glowSize || (level === "high" ? 150 : 120),
+    hasCenterHole: zone.hasCenterHole !== undefined ? zone.hasCenterHole : level === "high",
+    timeOfDay: zone.timeOfDay || "19.00 - 02.00 WIB",
+    peakHours: zone.peakHours || "20.00 - 01.00 WIB",
+    safePoint: zone.safePoint || "Pos Polisi Terdekat",
+    safeDistance: zone.safeDistance || "350 m",
+    incidentTypes: zone.incidentTypes || [
+      { name: "Penerangan Minim", total: Math.max(1, Math.floor(incidentCount * 0.6)), color: "#f59e0b" },
+      { name: "Catcalling", total: Math.max(1, Math.floor(incidentCount * 0.3)), color: "#ec4899" },
+      { name: "Jalan Sepi", total: Math.max(1, Math.floor(incidentCount * 0.1)), color: "#7c3aed" },
+    ],
+  }
+}
+
+// normalisasi safe point ke format dot heatmap
+const normalizeSafePointForHeatmap = (point) => {
+  const title = point.name || "Titik Aman (Safe Point)"
+  const category = point.categoryLabel || "Pos Keamanan / Titik Aman"
+  const location = point.address || point.name || "Area Aman"
+  const areaName = point.name || "Safe Point"
+
+  return {
+    ...point,
+    id: point.id || `sp-${title.toLowerCase().replace(/\s+/g, "-")}`,
+    title,
+    name: title,
+    category,
+    categoryLabel: category,
+    riskLevel: "safe",
+    location,
+    areaName,
+    incidentCount: 0,
+    totalReports: 0,
+    riskScore: 10,
+    coordinates: point.coordinates,
+    isDot: true,
+    color: "#0284c7",
+    timeOfDay: "24 Jam Siaga",
+    peakHours: "24 Jam",
+    safePoint: title,
+    safeDistance: "0 m",
+    features: point.features || ["Penjagaan 24 Jam", "Lampu Penerangan Terang", "Jalur Evakuasi"],
+    incidentTypes: [],
+  }
+}
 
 export function SafeRouteMapView({
   routeData,
@@ -43,6 +121,8 @@ export function SafeRouteMapView({
   // state kontrol layer peta
   const [showSafePoints, setShowSafePoints] = useState(true)
   const [showRiskZones, setShowRiskZones] = useState(true)
+  // state insiden heatmap terpilih
+  const [selectedIncident, setSelectedIncident] = useState(null)
   // state tinggi bottom sheet mobile ("minimized", "half", "expanded")
   const [sheetState, setSheetState] = useState("half")
   const [dragOffset, setDragOffset] = useState(0)
@@ -139,43 +219,6 @@ export function SafeRouteMapView({
   const isBlankSpot = routeData?.isBlankSpot
   const activeRoute = routes.find((r) => r.id === selectedRouteId) || routes[0]
 
-  // helper popup safe point
-  const createSafePointPopup = (mapboxgl, point) => {
-    return new mapboxgl.Popup({ offset: 15, maxWidth: "260px" }).setHTML(`
-      <div style="padding: 6px; font-family: inherit;">
-        <div style="font-weight: 800; font-size: 13px; color: #0f172a; margin-bottom: 2px;">
-          ${point.name}
-        </div>
-        <div style="display: inline-block; padding: 2px 6px; font-size: 10px; background: #e0f2fe; color: #0369a1; border-radius: 4px; font-weight: 700; margin-bottom: 4px;">
-          ${point.categoryLabel}
-        </div>
-        <div style="font-size: 11px; color: #475569; margin-bottom: 4px;">
-          ${point.address}
-        </div>
-        <div style="font-size: 10px; color: #e26d9b; font-weight: 700;">
-          ${point.is24Hours ? "✓ Siaga 24 Jam" : "Jam Operasional Terjadwal"}
-        </div>
-      </div>
-    `)
-  }
-
-  // helper popup zona risiko
-  const createRiskZonePopup = (mapboxgl, zone) => {
-    return new mapboxgl.Popup({ offset: 15, maxWidth: "260px" }).setHTML(`
-      <div style="padding: 6px; font-family: inherit;">
-        <div style="font-weight: 800; font-size: 13px; color: #b91c1c; margin-bottom: 2px;">
-          ⚠️ ${zone.name}
-        </div>
-        <div style="display: inline-block; padding: 2px 6px; font-size: 10px; background: #fee2e2; color: #991b1b; border-radius: 4px; font-weight: 700; margin-bottom: 4px;">
-          Tingkat Risiko: ${zone.riskLevel} (${zone.incidentCount} Riwayat Laporan)
-        </div>
-        <div style="font-size: 11px; color: #475569;">
-          ${zone.reason}
-        </div>
-      </div>
-    `)
-  }
-
   // inisialisasi mapbox instance
   useEffect(() => {
     if (typeof window === "undefined" || !mapContainerRef.current) return
@@ -259,7 +302,7 @@ export function SafeRouteMapView({
           if (map.getSource(dotsSourceId)) map.removeSource(dotsSourceId)
         })
 
-        // gambar titik-titik lingkaran rute
+        // gambar titik-titik rute (screen space dots)
         if (activeRoute && activeRoute.coordinates?.length >= 2) {
           const route = activeRoute
           const dotsSourceId = `route-dots-source-${route.id}`
@@ -318,70 +361,219 @@ export function SafeRouteMapView({
 
         // render safe points
         if (showSafePoints && safePoints.length > 0) {
-          safePoints.forEach((point) => {
+          safePoints.forEach((rawPoint) => {
+            const item = normalizeSafePointForHeatmap(rawPoint)
+            const isSelected = selectedIncident?.id === item.id
+            const dotColor = item.color || "#0284c7"
+
             const el = document.createElement("div")
-            el.className =
-              "w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:scale-110 transition-transform"
+            el.className = `relative flex flex-col items-center justify-center transition-transform duration-200 pointer-events-none has-[.inner-circle:hover]:z-[45] ${
+              isSelected ? "scale-125 z-30" : "z-10"
+            }`
+            el.style.width = "16px"
+            el.style.height = "16px"
+
             el.innerHTML = `
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
-              </svg>
+              <div class="relative flex items-center justify-center w-full h-full">
+                <div class="inner-circle group relative z-30 pointer-events-auto flex items-center justify-center cursor-pointer">
+                  <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[45] whitespace-nowrap">
+                    <div 
+                      class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-lg border border-white/20 text-xs font-medium leading-tight"
+                      style="background-color: ${dotColor};"
+                    >
+                      <span class="font-bold text-white text-[11px] drop-shadow-xs">${item.areaName || item.title}</span>
+                      <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[170px] truncate text-center drop-shadow-xs">
+                        🛡️ ${item.category || item.categoryLabel || 'Titik Aman'}
+                      </span>
+                      <div 
+                        class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
+                        style="background-color: ${dotColor};"
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div 
+                    class="w-3.5 h-3.5 rounded-full shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
+                      isSelected ? "ring-2 ring-sky-400 ring-offset-2" : ""
+                    }"
+                    style="background-color: ${dotColor};"
+                  ></div>
+                </div>
+              </div>
             `
 
-            const marker = new mapboxgl.Marker({ element: el })
-              .setLngLat(point.coordinates)
-              .setPopup(createSafePointPopup(mapboxgl, point))
+            // klik buka detail drawer
+            el.addEventListener("click", (e) => {
+              e.stopPropagation()
+              setSelectedIncident(item)
+              if (map) {
+                map.flyTo({
+                  center: item.coordinates,
+                  zoom: 15,
+                  duration: 800,
+                })
+              }
+            })
+
+            const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+              .setLngLat(item.coordinates)
               .addTo(map)
 
+            if (marker.getElement()) marker.getElement().style.zIndex = "20"
             markersRef.current.push(marker)
           })
         }
 
-        // render zona risiko
+        // render zona risiko heatmap
         if (showRiskZones && riskZones.length > 0) {
-          riskZones.forEach((zone) => {
-            const el = document.createElement("div")
-            el.className =
-              "w-8 h-8 rounded-full bg-rose-500/20 text-rose-600 flex items-center justify-center border-2 border-rose-500 animate-pulse cursor-pointer hover:scale-110 transition-transform"
-            el.innerHTML = `
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            `
+          riskZones.forEach((rawZone) => {
+            const item = normalizeRiskZoneForHeatmap(rawZone)
+            const levelUpper = (item.riskLevel || "high").toUpperCase()
+            const riskMeta = RISK_LEVELS[levelUpper] || RISK_LEVELS.HIGH
+            const isSelected = selectedIncident?.id === item.id
 
-            const marker = new mapboxgl.Marker({ element: el })
-              .setLngLat(zone.coordinates)
-              .setPopup(createRiskZonePopup(mapboxgl, zone))
+            const el = document.createElement("div")
+            el.className = `relative flex flex-col items-center justify-center transition-transform duration-200 pointer-events-none has-[.inner-circle:hover]:z-[45] ${
+              isSelected ? "scale-125 z-30" : "z-10"
+            }`
+
+            if (item.isDot) {
+              const dotColor = item.color || "#3b82f6"
+              el.style.width = "16px"
+              el.style.height = "16px"
+              el.innerHTML = `
+                <div class="relative flex items-center justify-center w-full h-full">
+                  <div class="inner-circle group relative z-30 pointer-events-auto flex items-center justify-center cursor-pointer">
+                    <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[45] whitespace-nowrap">
+                      <div 
+                        class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-lg border border-white/20 text-xs font-medium leading-tight"
+                        style="background-color: ${dotColor};"
+                      >
+                        <span class="font-bold text-white text-[11px] drop-shadow-xs">${item.areaName || item.title || item.name}</span>
+                        <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[170px] truncate text-center drop-shadow-xs">
+                          ${item.category || item.reason || 'Insiden'}
+                        </span>
+                        <div 
+                          class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
+                          style="background-color: ${dotColor};"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div 
+                      class="w-3.5 h-3.5 rounded-full shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
+                        isSelected ? "ring-2 ring-primary ring-offset-2" : ""
+                      }"
+                      style="background-color: ${dotColor};"
+                    ></div>
+                  </div>
+                </div>
+              `
+            } else {
+              // visual hotspot glow sama persis interactive map
+              const glowSize = item.glowSize || 130
+              el.style.width = `${glowSize}px`
+              el.style.height = `${glowSize}px`
+
+              const glowColor = riskMeta?.glowColor || "rgba(239, 68, 68, 0.55)"
+              const pulseColor = riskMeta?.pulseColor || "rgba(239, 68, 68, 0.2)"
+              const solidColor = riskMeta?.color || "#ef4444"
+
+              el.innerHTML = `
+                <div class="relative flex items-center justify-center w-full h-full pointer-events-none">
+                  <div 
+                    class="absolute rounded-full pointer-events-none transition-transform duration-300"
+                    style="
+                      width: ${glowSize}px;
+                      height: ${glowSize}px;
+                      background: radial-gradient(circle, ${glowColor} 0%, ${pulseColor} 48%, rgba(255,255,255,0) 70%);
+                      filter: blur(10px);
+                    "
+                  ></div>
+
+                  <div class="inner-circle group relative z-30 pointer-events-auto flex items-center justify-center cursor-pointer">
+                    <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[45] whitespace-nowrap">
+                      <div 
+                        class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-xl border border-white/20 text-xs font-medium leading-tight"
+                        style="background-color: ${solidColor};"
+                      >
+                        <span class="font-bold text-white text-[11px] drop-shadow-xs">${item.areaName || item.title || item.name}</span>
+                        <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[180px] truncate text-center drop-shadow-xs">
+                          ${item.category || item.reason || 'Zona Rawan'} • ${riskMeta?.label || 'Tinggi'}
+                        </span>
+                        <div 
+                          class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
+                          style="background-color: ${solidColor};"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div 
+                      class="relative z-10 w-4 h-4 rounded-full flex items-center justify-center shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
+                        isSelected ? "ring-2 ring-primary ring-offset-2" : ""
+                      }"
+                      style="background-color: ${solidColor};"
+                    >
+                      ${
+                        item.hasCenterHole || item.riskLevel === "high" || item.riskLevel === "Tinggi"
+                          ? `<div class="w-1.5 h-1.5 rounded-full bg-white shadow-xs"></div>`
+                          : ""
+                      }
+                    </div>
+                  </div>
+                </div>
+              `
+            }
+
+            // klik buka detail drawer
+            el.addEventListener("click", (e) => {
+              e.stopPropagation()
+              setSelectedIncident(item)
+              if (map) {
+                map.flyTo({
+                  center: item.coordinates,
+                  zoom: 14.5,
+                  duration: 800,
+                })
+              }
+            })
+
+            const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+              .setLngLat(item.coordinates)
               .addTo(map)
 
+            if (marker.getElement()) marker.getElement().style.zIndex = item.isDot ? "20" : "15"
             markersRef.current.push(marker)
           })
         }
 
-        // render pin titik awal & tujuan
+        // render pin titik awal & tujuan - layer paling atas
         if (activeRoute && activeRoute.coordinates.length >= 2) {
           const startCoords = activeRoute.coordinates[0]
           const endCoords = activeRoute.coordinates[activeRoute.coordinates.length - 1]
 
           // pin jemput primary
           const startEl = document.createElement("div")
-          startEl.className = "w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl"
+          startEl.className = "relative z-[90] w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl select-none"
+          startEl.style.zIndex = "90"
           startEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ffa2cf" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
-          const startMarker = new mapboxgl.Marker({ element: startEl })
+          const startMarker = new mapboxgl.Marker({ element: startEl, anchor: "bottom" })
             .setLngLat(startCoords)
             .addTo(map)
 
           // pin tujuan rose
           const endEl = document.createElement("div")
-          endEl.className = "w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl"
-          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+          endEl.className = "relative z-[90] w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl select-none"
+          endEl.style.zIndex = "90"
+          endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
 
           const endMarker = new mapboxgl.Marker({ element: endEl, anchor: "bottom" })
             .setLngLat(endCoords)
             .addTo(map)
+
+          if (startMarker.getElement()) startMarker.getElement().style.zIndex = "90"
+          if (endMarker.getElement()) endMarker.getElement().style.zIndex = "90"
 
           markersRef.current.push(startMarker, endMarker)
 
@@ -405,7 +597,7 @@ export function SafeRouteMapView({
         map.once("load", render)
       }
     })
-  }, [routes, selectedRouteId, safePoints, riskZones, showSafePoints, showRiskZones, activeRoute])
+  }, [routes, selectedRouteId, safePoints, riskZones, showSafePoints, showRiskZones, activeRoute, selectedIncident])
 
   // handler share tracking
   const handleShareTracking = () => {
@@ -767,6 +959,14 @@ export function SafeRouteMapView({
           </button>
         </div>
       </div>
+
+      {/* drawer detail insiden hotspot */}
+      <IncidentDetailDrawer
+        incident={selectedIncident ? enrichHeatmapIncident(selectedIncident) : null}
+        isOpen={!!selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+        onOpenReport={() => {}}
+      />
     </div>
   )
 }

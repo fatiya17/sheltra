@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog"
 import { useAuth } from "@/features/auth/context/auth-context"
 import { AuthGuard } from "@/components/auth/auth-guard"
+import { DEFAULT_TRUSTED_CONTACTS, SOS_STORAGE_KEYS } from "@/features/sos/constants/sos.constants"
 
 // pilihan avatar dicebear lorelei pastel
 const CUTE_OPEN_SOURCE_AVATARS = [
@@ -98,30 +99,33 @@ export default function ProfilePage() {
     if (user?.avatar) setSelectedAvatar(user.avatar)
   }, [user])
 
-  // State Kontak Terpercaya (Menggunakan Avatar Open Source Lucu)
-  const [contacts, setContacts] = useState([
-    {
-      id: "tc-1",
-      name: "Alzea",
-      username: "@alzea",
-      phone: "+6281234567890",
-      avatar: CUTE_OPEN_SOURCE_AVATARS[1], // Kelinci
-    },
-    {
-      id: "tc-2",
-      name: "Yafie",
-      username: "@yafie_k",
-      phone: "+6281398765432",
-      avatar: CUTE_OPEN_SOURCE_AVATARS[2], // Beruang
-    },
-    {
-      id: "tc-3",
-      name: "Sally",
-      username: "@sally_m",
-      phone: "+6281122334455",
-      avatar: CUTE_OPEN_SOURCE_AVATARS[5], // Puppy
-    },
-  ])
+  // state kontak terpercaya
+  const [contacts, setContacts] = useState(DEFAULT_TRUSTED_CONTACTS)
+
+  // load kontak tersimpan di localstorage
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(SOS_STORAGE_KEYS.CONTACTS)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setContacts(parsed)
+          }
+        }
+      } catch (e) {}
+    }
+  }, [])
+
+  // helper simpan kontak ke localstorage
+  const persistContacts = (updated) => {
+    setContacts(updated)
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(SOS_STORAGE_KEYS.CONTACTS, JSON.stringify(updated))
+      } catch (e) {}
+    }
+  }
 
   // State Modals
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
@@ -146,6 +150,26 @@ export default function ProfilePage() {
     sendSmsFallback: true,
     notifyOnDangerZone: true,
   })
+
+  // load rules dari localstorage
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_emergency_rules")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setRulesSettings((prev) => ({ ...prev, ...parsed }))
+      }
+    } catch (e) {}
+  }, [])
+
+  // simpan rules ke localstorage saat berubah
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      localStorage.setItem("sheltra_emergency_rules", JSON.stringify(rulesSettings))
+    } catch (e) {}
+  }, [rulesSettings])
 
   // simpan perubahan profil
   const handleSaveProfile = (e) => {
@@ -198,28 +222,34 @@ export default function ProfilePage() {
       : `@${contactName.toLowerCase().replace(/\s+/g, "_")}`
 
     if (editingContact) {
-      setContacts((prev) =>
-        prev.map((c) =>
-          c.id === editingContact.id
-            ? {
-                ...c,
-                name: contactName.trim(),
-                phone: contactPhone.trim(),
-                username: formattedUsername,
-                avatar: selectedContactAvatar,
-              }
-            : c
-        )
+      const updated = contacts.map((c) =>
+        c.id === editingContact.id
+          ? {
+              ...c,
+              name: contactName.trim(),
+              phone: contactPhone.trim(),
+              username: formattedUsername,
+              avatar: selectedContactAvatar,
+              avatarImage: selectedContactAvatar.url,
+              avatarBg: selectedContactAvatar.bg,
+            }
+          : c
       )
+      persistContacts(updated)
     } else {
       const newContact = {
         id: `tc-${Date.now()}`,
         name: contactName.trim(),
+        relation: "Kontak Darurat",
         phone: contactPhone.trim(),
         username: formattedUsername,
         avatar: selectedContactAvatar,
+        avatarImage: selectedContactAvatar.url,
+        avatarBg: selectedContactAvatar.bg,
+        badgeColor: "bg-emerald-500",
       }
-      setContacts((prev) => [...prev, newContact])
+      const updated = [...contacts, newContact]
+      persistContacts(updated)
     }
     setIsContactModalOpen(false)
   }
@@ -227,7 +257,8 @@ export default function ProfilePage() {
   // Hapus Kontak
   const handleDeleteContact = () => {
     if (!editingContact) return
-    setContacts((prev) => prev.filter((c) => c.id !== editingContact.id))
+    const updated = contacts.filter((c) => c.id !== editingContact.id)
+    persistContacts(updated)
     setIsContactModalOpen(false)
   }
 

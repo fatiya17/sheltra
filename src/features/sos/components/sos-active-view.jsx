@@ -910,17 +910,28 @@ export function SosActiveView({
         {/* info kontak */}
         <div className="mt-4 bg-[#FCF5F6] border border-[#F8E8ED] rounded-2xl px-4 py-[14px] flex items-center gap-3">
           <div className="flex items-center shrink-0">
-            {trustedContacts.slice(0, 2).map((c, i) => (
-              <div
-                key={c.id}
-                className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold ${c.avatarBg || "bg-rose-400 text-white"} ${i > 0 ? "-ml-2" : ""}`}
-              >
-                {c.avatarInitial || c.name.substring(0, 2).toUpperCase()}
-              </div>
-            ))}
-            {trustedContacts.length > 2 && (
-              <div className="w-9 h-9 rounded-full border-2 border-white bg-slate-500 text-white flex items-center justify-center text-xs font-bold -ml-2">
-                +{trustedContacts.length - 2}
+            {trustedContacts.slice(0, 3).map((c, i) => {
+              const avatarUrl = c.avatar?.url || c.avatarImage || `https://api.dicebear.com/7.x/lorelei/svg?seed=${c.name}&backgroundColor=ffe4e6`
+              const avatarBg = c.avatar?.bg || c.avatarBg || "bg-[#FFE4E6]"
+              return (
+                <div
+                  key={c.id}
+                  className={`w-9 h-9 rounded-full border-2 border-white ${avatarBg} shadow-xs flex items-center justify-center overflow-hidden shrink-0 ${
+                    i > 0 ? "-ml-2.5" : ""
+                  }`}
+                  title={`${c.name} (${c.username || c.relation || ""})`}
+                >
+                  <img
+                    src={avatarUrl}
+                    alt={c.name}
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+              )
+            })}
+            {trustedContacts.length > 3 && (
+              <div className="w-9 h-9 rounded-full border-2 border-white bg-[#C00D53] text-white flex items-center justify-center text-xs font-bold -ml-2.5 shadow-xs shrink-0">
+                +{trustedContacts.length - 3}
               </div>
             )}
           </div>
@@ -1022,17 +1033,28 @@ export function SosActiveView({
             {/* info kontak tepercaya */}
             <div className="bg-[#FCF5F6] border border-[#F8E8ED] rounded-2xl px-4 py-[14px] flex items-center gap-3">
               <div className="flex items-center shrink-0">
-                {trustedContacts.slice(0, 2).map((c, i) => (
-                  <div
-                    key={c.id}
-                    className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold ${c.avatarBg || "bg-rose-400 text-white"} ${i > 0 ? "-ml-2" : ""}`}
-                  >
-                    {c.avatarInitial || c.name.substring(0, 2).toUpperCase()}
-                  </div>
-                ))}
-                {trustedContacts.length > 2 && (
-                  <div className="w-9 h-9 rounded-full border-2 border-white bg-slate-500 text-white flex items-center justify-center text-xs font-bold -ml-2">
-                    +{trustedContacts.length - 2}
+                {trustedContacts.slice(0, 3).map((c, i) => {
+                  const avatarUrl = c.avatar?.url || c.avatarImage || `https://api.dicebear.com/7.x/lorelei/svg?seed=${c.name}&backgroundColor=ffe4e6`
+                  const avatarBg = c.avatar?.bg || c.avatarBg || "bg-[#FFE4E6]"
+                  return (
+                    <div
+                      key={c.id}
+                      className={`w-9 h-9 rounded-full border-2 border-white ${avatarBg} shadow-xs flex items-center justify-center overflow-hidden shrink-0 ${
+                        i > 0 ? "-ml-2.5" : ""
+                      }`}
+                      title={`${c.name} (${c.username || c.relation || ""})`}
+                    >
+                      <img
+                        src={avatarUrl}
+                        alt={c.name}
+                        className="w-8 h-8 object-contain"
+                      />
+                    </div>
+                  )
+                })}
+                {trustedContacts.length > 3 && (
+                  <div className="w-9 h-9 rounded-full border-2 border-white bg-[#C00D53] text-white flex items-center justify-center text-xs font-bold -ml-2.5 shadow-xs shrink-0">
+                    +{trustedContacts.length - 3}
                   </div>
                 )}
               </div>

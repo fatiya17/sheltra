@@ -47,7 +47,85 @@ import { Button } from "@/components/ui/button"
 import { TimePicker } from "@/components/ui/time-picker"
 import { useToast } from "@/components/ui/toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { IncidentDetailDrawer } from "@/features/heatmap/components/incident-detail-drawer"
+import { RISK_LEVELS } from "@/features/heatmap/constants/heatmap.constants"
+import { enrichHeatmapIncident } from "@/features/heatmap/services/heatmap.service"
 import "mapbox-gl/dist/mapbox-gl.css"
+
+// normalisasi zona risiko ke format hotspot heatmap
+const normalizeRiskZoneForHeatmap = (zone) => {
+  const levelStr = String(zone.riskLevel || "").toLowerCase()
+  let level = "high"
+  if (levelStr.includes("tinggi") || levelStr === "high") level = "high"
+  else if (levelStr.includes("sedang") || levelStr === "medium") level = "medium"
+  else if (levelStr.includes("rendah") || levelStr === "low") level = "low"
+  else if (levelStr.includes("aman") || levelStr === "safe") level = "safe"
+
+  const title = zone.title || zone.name || "Zona Rawan Insiden"
+  const category = zone.category || zone.reason || "Area Rawan Kejahatan"
+  const location = zone.location || zone.name || "Area Sekitar Rute"
+  const areaName = zone.areaName || zone.name?.replace(/Area |Gang |Jalur /gi, "") || "Zona Rawan"
+  const incidentCount = zone.incidentCount || zone.totalReports || 3
+  const riskScore = zone.riskScore || (level === "high" ? 85 : level === "medium" ? 65 : 35)
+
+  return {
+    ...zone,
+    id: zone.id || `rz-${title.toLowerCase().replace(/\s+/g, "-")}`,
+    title,
+    name: title,
+    category,
+    riskLevel: level,
+    location,
+    areaName,
+    incidentCount,
+    totalReports: incidentCount,
+    riskScore,
+    coordinates: zone.coordinates,
+    glowSize: zone.glowSize || (level === "high" ? 150 : 120),
+    hasCenterHole: zone.hasCenterHole !== undefined ? zone.hasCenterHole : level === "high",
+    timeOfDay: zone.timeOfDay || "19.00 - 02.00 WIB",
+    peakHours: zone.peakHours || "20.00 - 01.00 WIB",
+    safePoint: zone.safePoint || "Pos Polisi Terdekat",
+    safeDistance: zone.safeDistance || "350 m",
+    incidentTypes: zone.incidentTypes || [
+      { name: "Penerangan Minim", total: Math.max(1, Math.floor(incidentCount * 0.6)), color: "#f59e0b" },
+      { name: "Catcalling", total: Math.max(1, Math.floor(incidentCount * 0.3)), color: "#ec4899" },
+      { name: "Jalan Sepi", total: Math.max(1, Math.floor(incidentCount * 0.1)), color: "#7c3aed" },
+    ],
+  }
+}
+
+// normalisasi safe point ke format dot heatmap
+const normalizeSafePointForHeatmap = (point) => {
+  const title = point.name || "Titik Aman (Safe Point)"
+  const category = point.categoryLabel || "Pos Keamanan / Titik Aman"
+  const location = point.address || point.name || "Area Aman"
+  const areaName = point.name || "Safe Point"
+
+  return {
+    ...point,
+    id: point.id || `sp-${title.toLowerCase().replace(/\s+/g, "-")}`,
+    title,
+    name: title,
+    category,
+    categoryLabel: category,
+    riskLevel: "safe",
+    location,
+    areaName,
+    incidentCount: 0,
+    totalReports: 0,
+    riskScore: 10,
+    coordinates: point.coordinates,
+    isDot: true,
+    color: "#0284c7",
+    timeOfDay: "24 Jam Siaga",
+    peakHours: "24 Jam",
+    safePoint: title,
+    safeDistance: "0 m",
+    features: point.features || ["Penjagaan 24 Jam", "Lampu Penerangan Terang", "Jalur Evakuasi"],
+    incidentTypes: [],
+  }
+}
 
 const RouteMiniMap = ({ coordinates, riskLabel }) => {
   const containerRef = useRef(null)
@@ -131,6 +209,9 @@ export default function SafeCommute() {
   const [showSafePoints, setShowSafePoints] = useState(true)
   const [showRiskZones, setShowRiskZones] = useState(true)
 
+  // state insiden heatmap terpilih
+  const [selectedIncident, setSelectedIncident] = useState(null)
+
   // state bottom sheet mobile ("minimized", "half", "expanded")
   const [sheetState, setSheetState] = useState("half")
   const [dragOffset, setDragOffset] = useState(0)
@@ -154,6 +235,76 @@ export default function SafeCommute() {
   const [loadingCurrentStep, setLoadingCurrentStep] = useState(1)
 
   const hasExtraContent = (routeData?.routes?.length || 0) > 2 || Boolean(routeData?.timeRiskAnalysis)
+
+  // flag hydration localstorage
+  const isHydratedRef = useRef(false)
+
+  // load state dari localstorage saat mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_safe_route_state")
+      if (raw) {
+        const saved = JSON.parse(raw)
+        if (saved.originText) setOriginText(saved.originText)
+        if (saved.originCoords) setOriginCoords(saved.originCoords)
+        if (saved.destinationText) setDestinationText(saved.destinationText)
+        if (saved.destinationCoords) setDestinationCoords(saved.destinationCoords)
+        if (saved.departureTime) setDepartureTime(saved.departureTime)
+        if (saved.travelMode) setTravelMode(saved.travelMode)
+        if (saved.routeData) setRouteData(saved.routeData)
+        if (saved.selectedRouteId) setSelectedRouteId(saved.selectedRouteId)
+        if (saved.mobileStep) setMobileStep(saved.mobileStep)
+        if (saved.sheetState) setSheetState(saved.sheetState)
+        if (typeof saved.isNavigating === "boolean") setIsNavigating(saved.isNavigating)
+        if (typeof saved.showSafePoints === "boolean") setShowSafePoints(saved.showSafePoints)
+        if (typeof saved.showRiskZones === "boolean") setShowRiskZones(saved.showRiskZones)
+      }
+    } catch (e) {
+      console.warn("Gagal membaca safe route state dari localStorage:", e)
+    } finally {
+      isHydratedRef.current = true
+    }
+  }, [])
+
+  // simpan state ke localstorage saat berubah
+  useEffect(() => {
+    if (typeof window === "undefined" || !isHydratedRef.current) return
+    try {
+      const stateToSave = {
+        mobileStep,
+        originText,
+        originCoords,
+        destinationText,
+        destinationCoords,
+        departureTime,
+        travelMode,
+        routeData,
+        selectedRouteId,
+        isNavigating,
+        sheetState,
+        showSafePoints,
+        showRiskZones,
+      }
+      localStorage.setItem("sheltra_safe_route_state", JSON.stringify(stateToSave))
+    } catch (e) {
+      console.warn("Gagal menyimpan safe route state ke localStorage:", e)
+    }
+  }, [
+    mobileStep,
+    originText,
+    originCoords,
+    destinationText,
+    destinationCoords,
+    departureTime,
+    travelMode,
+    routeData,
+    selectedRouteId,
+    isNavigating,
+    sheetState,
+    showSafePoints,
+    showRiskZones,
+  ])
 
   // ── Touch / mouse drag handlers untuk bottom sheet ──────────────────
   const handleTouchStart = (e) => {
@@ -195,32 +346,105 @@ export default function SafeCommute() {
     window.addEventListener("mouseup", handleMouseUp)
   }
 
-  // ── Derived values ──────────────────────────────────────────────────
-  const routes = routeData?.routes || []
-  const activeRoute = routes.find((r) => r.id === selectedRouteId) || routes[0]
-  const safePoints = routeData?.safePoints || []
-  const riskZones = routeData?.riskZones || []
-  const isBlankSpot = routeData?.isBlankSpot || false
+  // default preset rute bila belum selesai fetch
+  const defaultPresetRoutes = [
+    {
+      id: "route-1",
+      name: "Rute Teraman via Jl. Sudirman",
+      title: "Rute Teraman",
+      duration: "16 Menit",
+      distance: "5.2 km",
+      safetyScore: 92,
+      riskLevel: "Rendah",
+      safePointsCount: 7,
+      color: "#16a34a",
+      coordinates: [
+        [106.8227, -6.2088],
+        [106.8215, -6.2150],
+        [106.8180, -6.2230],
+        [106.8120, -6.2280],
+        [106.8105, -6.2307],
+      ],
+    },
+    {
+      id: "route-2",
+      name: "Rute Tercepat via Jl. Senopati",
+      title: "Rute Tercepat",
+      duration: "11 Menit",
+      distance: "4.1 km",
+      safetyScore: 68,
+      riskLevel: "Sedang",
+      safePointsCount: 4,
+      color: "#d97706",
+      coordinates: [
+        [106.8227, -6.2088],
+        [106.8190, -6.2180],
+        [106.8130, -6.2250],
+        [106.8105, -6.2307],
+      ],
+    },
+    {
+      id: "route-3",
+      name: "Jalan Alternatif via SCBD",
+      title: "Jalan Alternatif",
+      duration: "14 Menit",
+      distance: "4.8 km",
+      safetyScore: 45,
+      riskLevel: "Tinggi",
+      safePointsCount: 2,
+      color: "#dc2626",
+      coordinates: [
+        [106.8227, -6.2088],
+        [106.8250, -6.2160],
+        [106.8160, -6.2260],
+        [106.8105, -6.2307],
+      ],
+    },
+  ]
 
-  // ── Helper popups ───────────────────────────────────────────────────
-  const createSafePointPopup = (mapboxgl, sp) => {
-    return new mapboxgl.Popup({ offset: 15, maxWidth: "260px" }).setHTML(`
-      <div style="padding: 6px; font-family: inherit;">
-        <div style="font-weight: 800; font-size: 13px; color: #0369a1; margin-bottom: 2px;">🛡️ ${sp.name}</div>
-        <div style="display: inline-block; padding: 2px 6px; font-size: 10px; background: #e0f2fe; color: #0369a1; border-radius: 4px; font-weight: 700; margin-bottom: 4px;">${sp.categoryLabel}</div>
-        ${sp.features?.map((f) => `<div style="font-size: 11px; color: #475569;">• ${f}</div>`).join("") || ""}
-      </div>
-    `)
-  }
-  const createRiskZonePopup = (mapboxgl, zone) => {
-    return new mapboxgl.Popup({ offset: 15, maxWidth: "260px" }).setHTML(`
-      <div style="padding: 6px; font-family: inherit;">
-        <div style="font-weight: 800; font-size: 13px; color: #b91c1c; margin-bottom: 2px;">⚠️ ${zone.name}</div>
-        <div style="display: inline-block; padding: 2px 6px; font-size: 10px; background: #fee2e2; color: #991b1b; border-radius: 4px; font-weight: 700; margin-bottom: 4px;">Tingkat Risiko: ${zone.riskLevel} (${zone.incidentCount} Riwayat Laporan)</div>
-        <div style="font-size: 11px; color: #475569;">${zone.reason}</div>
-      </div>
-    `)
-  }
+  const defaultSafePoints = [
+    {
+      id: "sp-1",
+      name: "Pos Polisi Bundaran HI",
+      categoryLabel: "Pos Polisi 24 Jam",
+      coordinates: [106.8227, -6.2088],
+      features: ["Penjagaan 24 Jam", "CCTV Aktif"],
+    },
+    {
+      id: "sp-2",
+      name: "Pos Satpam SCBD Gate",
+      categoryLabel: "Pos Keamanan Komersial",
+      coordinates: [106.8180, -6.2230],
+      features: ["Penjagaan 24 Jam", "Lampu Penerangan Terang", "Jalur Evakuasi"],
+    },
+    {
+      id: "sp-3",
+      name: "Klinik 24 Jam Senopati",
+      categoryLabel: "Fasilitas Kesehatan",
+      coordinates: [106.8120, -6.2280],
+      features: ["Layanan Medis Darurat", "Penerangan Baik"],
+    },
+  ]
+
+  const defaultRiskZones = [
+    {
+      id: "rz-1",
+      name: "Area Minim Penerangan Senopati",
+      title: "Area Minim Penerangan Senopati",
+      category: "Penerangan Minim",
+      riskLevel: "Tinggi",
+      incidentCount: 5,
+      reason: "Jalan sepi dan lampu jalan beberapa kali mati",
+      coordinates: [106.8145, -6.2260],
+    },
+  ]
+
+  // derived values
+  const routes = (routeData?.routes && routeData.routes.length > 0) ? routeData.routes : defaultPresetRoutes
+  const activeRoute = routes.find((r) => r.id === selectedRouteId) || routes[0]
+  const safePoints = (routeData?.safePoints && routeData.safePoints.length > 0) ? routeData.safePoints : defaultSafePoints
+  const riskZones = (routeData?.riskZones && routeData.riskZones.length > 0) ? routeData.riskZones : defaultRiskZones
+  const isBlankSpot = routeData?.isBlankSpot || false
 
   // ── Mapbox init ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -330,6 +554,7 @@ export default function SafeCommute() {
           })
         }
         if (activeRoute?.coordinates?.length >= 2) {
+          // titik-titik rute (screen space dots)
           const dotsSourceId = "safe-route-dots-source"
           const dotsCasingId = "safe-route-dots-casing"
           const dotsLayerId = "safe-route-dots-layer"
@@ -384,37 +609,212 @@ export default function SafeCommute() {
           map.on("zoomend", updateScreenDots)
           map.on("moveend", updateScreenDots)
         }
-        if (showSafePoints) {
-          safePoints.forEach((sp) => {
+        if (showSafePoints && safePoints.length > 0) {
+          safePoints.forEach((rawPoint) => {
+            const item = normalizeSafePointForHeatmap(rawPoint)
+            const isSelected = selectedIncident?.id === item.id
+            const dotColor = item.color || "#0284c7"
+
             const el = document.createElement("div")
-            el.className = "w-7 h-7 rounded-full bg-sky-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-lg cursor-pointer"
-            el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`
-            const popup = createSafePointPopup(mapboxgl, sp)
-            const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat(sp.coordinates).setPopup(popup).addTo(map)
+            el.className = `relative flex flex-col items-center justify-center transition-transform duration-200 pointer-events-none has-[.inner-circle:hover]:z-[9999] ${
+              isSelected ? "scale-125 z-40" : "z-10"
+            }`
+            el.style.width = "16px"
+            el.style.height = "16px"
+
+            el.innerHTML = `
+              <div class="relative flex items-center justify-center w-full h-full">
+                <div class="inner-circle group relative z-50 pointer-events-auto flex items-center justify-center cursor-pointer">
+                  <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[9999] whitespace-nowrap">
+                    <div 
+                      class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-lg border border-white/20 text-xs font-medium leading-tight"
+                      style="background-color: ${dotColor};"
+                    >
+                      <span class="font-bold text-white text-[11px] drop-shadow-xs">${item.areaName || item.title}</span>
+                      <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[170px] truncate text-center drop-shadow-xs">
+                        🛡️ ${item.category || item.categoryLabel || 'Titik Aman'}
+                      </span>
+                      <div 
+                        class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
+                        style="background-color: ${dotColor};"
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div 
+                    class="w-3.5 h-3.5 rounded-full shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
+                      isSelected ? "ring-2 ring-sky-400 ring-offset-2" : ""
+                    }"
+                    style="background-color: ${dotColor};"
+                  ></div>
+                </div>
+              </div>
+            `
+
+            // klik buka detail drawer
+            el.addEventListener("click", (e) => {
+              e.stopPropagation()
+              setSelectedIncident(item)
+              if (map) {
+                map.flyTo({
+                  center: item.coordinates,
+                  zoom: 15,
+                  duration: 800,
+                })
+              }
+            })
+
+            const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+              .setLngLat(item.coordinates)
+              .addTo(map)
+
+            if (marker.getElement()) marker.getElement().style.zIndex = "20"
             markersRef.current.push(marker)
           })
         }
         if (showRiskZones) {
-          riskZones.forEach((zone) => {
+          riskZones.forEach((rawZone) => {
+            const item = normalizeRiskZoneForHeatmap(rawZone)
+            const levelUpper = (item.riskLevel || "high").toUpperCase()
+            const riskMeta = RISK_LEVELS[levelUpper] || RISK_LEVELS.HIGH
+            const isSelected = selectedIncident?.id === item.id
+
             const el = document.createElement("div")
-            el.className = "w-8 h-8 rounded-full bg-rose-600/80 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-lg cursor-pointer"
-            el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
-            const popup = createRiskZonePopup(mapboxgl, zone)
-            const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat(zone.coordinates).setPopup(popup).addTo(map)
+            el.className = `relative flex flex-col items-center justify-center transition-transform duration-200 pointer-events-none has-[.inner-circle:hover]:z-[45] ${
+              isSelected ? "scale-125 z-30" : "z-10"
+            }`
+
+            if (item.isDot) {
+              const dotColor = item.color || "#3b82f6"
+              el.style.width = "16px"
+              el.style.height = "16px"
+              el.innerHTML = `
+                <div class="relative flex items-center justify-center w-full h-full">
+                  <div class="inner-circle group relative z-30 pointer-events-auto flex items-center justify-center cursor-pointer">
+                    <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[45] whitespace-nowrap">
+                      <div 
+                        class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-lg border border-white/20 text-xs font-medium leading-tight"
+                        style="background-color: ${dotColor};"
+                      >
+                        <span class="font-bold text-white text-[11px] drop-shadow-xs">${item.areaName || item.title || item.name}</span>
+                        <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[170px] truncate text-center drop-shadow-xs">
+                          ${item.category || item.reason || 'Insiden'}
+                        </span>
+                        <div 
+                          class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
+                          style="background-color: ${dotColor};"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div 
+                      class="w-3.5 h-3.5 rounded-full shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
+                        isSelected ? "ring-2 ring-primary ring-offset-2" : ""
+                      }"
+                      style="background-color: ${dotColor};"
+                    ></div>
+                  </div>
+                </div>
+              `
+            } else {
+              // visual hotspot glow sama persis interactive map
+              const glowSize = item.glowSize || 130
+              el.style.width = `${glowSize}px`
+              el.style.height = `${glowSize}px`
+
+              const glowColor = riskMeta?.glowColor || "rgba(239, 68, 68, 0.55)"
+              const pulseColor = riskMeta?.pulseColor || "rgba(239, 68, 68, 0.2)"
+              const solidColor = riskMeta?.color || "#ef4444"
+
+              el.innerHTML = `
+                <div class="relative flex items-center justify-center w-full h-full pointer-events-none">
+                  <div 
+                    class="absolute rounded-full pointer-events-none transition-transform duration-300"
+                    style="
+                      width: ${glowSize}px;
+                      height: ${glowSize}px;
+                      background: radial-gradient(circle, ${glowColor} 0%, ${pulseColor} 48%, rgba(255,255,255,0) 70%);
+                      filter: blur(10px);
+                    "
+                  ></div>
+
+                  <div class="inner-circle group relative z-30 pointer-events-auto flex items-center justify-center cursor-pointer">
+                    <div class="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none z-[45] whitespace-nowrap">
+                      <div 
+                        class="relative flex flex-col items-center text-white px-2.5 py-1 rounded-xl shadow-xl border border-white/20 text-xs font-medium leading-tight"
+                        style="background-color: ${solidColor};"
+                      >
+                        <span class="font-bold text-white text-[11px] drop-shadow-xs">${item.areaName || item.title || item.name}</span>
+                        <span class="text-[10px] text-white/90 font-medium mt-0.5 max-w-[180px] truncate text-center drop-shadow-xs">
+                          ${item.category || item.reason || 'Zona Rawan'} • ${riskMeta?.label || 'Tinggi'}
+                        </span>
+                        <div 
+                          class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 border-r border-b border-white/20"
+                          style="background-color: ${solidColor};"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div 
+                      class="relative z-10 w-4 h-4 rounded-full flex items-center justify-center shadow-md transition-transform duration-200 group-hover:scale-125 border-2 border-white ${
+                        isSelected ? "ring-2 ring-primary ring-offset-2" : ""
+                      }"
+                      style="background-color: ${solidColor};"
+                    >
+                      ${
+                        item.hasCenterHole || item.riskLevel === "high" || item.riskLevel === "Tinggi"
+                          ? `<div class="w-1.5 h-1.5 rounded-full bg-white shadow-xs"></div>`
+                          : ""
+                      }
+                    </div>
+                  </div>
+                </div>
+              `
+            }
+
+            // klik buka detail drawer
+            el.addEventListener("click", (e) => {
+              e.stopPropagation()
+              setSelectedIncident(item)
+              if (map) {
+                map.flyTo({
+                  center: item.coordinates,
+                  zoom: 14.5,
+                  duration: 800,
+                })
+              }
+            })
+
+            const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+              .setLngLat(item.coordinates)
+              .addTo(map)
+
+            if (marker.getElement()) marker.getElement().style.zIndex = item.isDot ? "20" : "15"
             markersRef.current.push(marker)
           })
         }
         if (activeRoute?.coordinates?.length >= 2) {
           const startCoords = activeRoute.coordinates[0]
           const endCoords = activeRoute.coordinates[activeRoute.coordinates.length - 1]
+          
+          // pin penjemputan (titik awal) - layer paling atas
           const startEl = document.createElement("div")
-          startEl.className = "w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl"
+          startEl.className = "relative z-[90] w-8 h-10 flex items-center justify-center cursor-pointer drop-shadow-xl select-none"
+          startEl.style.zIndex = "90"
           startEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#ffa2cf" stroke="#ffffff" stroke-width="2.4"/><path d="M19 29V14.2M19 14.2L13.4 19.8M19 14.2L24.6 19.8" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+          
+          // pin tujuan - layer paling atas
           const endEl = document.createElement("div")
-          endEl.className = "w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl"
+          endEl.className = "relative z-[90] w-9 h-11 flex items-center justify-center cursor-pointer drop-shadow-xl select-none"
+          endEl.style.zIndex = "90"
           endEl.innerHTML = `<svg viewBox="0 0 38 48" width="34" height="42" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0C8.5 0 0 8.5 0 19C0 32.5 19 48 19 48C19 48 38 32.5 38 19C38 8.5 29.5 0 19 0Z" fill="#e8195a" stroke="#ffffff" stroke-width="2.4"/><circle cx="19" cy="19" r="6.5" fill="white"/></svg>`
+          
           const startMarker = new mapboxgl.Marker({ element: startEl, anchor: "bottom" }).setLngLat(startCoords).addTo(map)
           const endMarker = new mapboxgl.Marker({ element: endEl, anchor: "bottom" }).setLngLat(endCoords).addTo(map)
+          
+          if (startMarker.getElement()) startMarker.getElement().style.zIndex = "90"
+          if (endMarker.getElement()) endMarker.getElement().style.zIndex = "90"
+
           markersRef.current.push(startMarker, endMarker)
           const bounds = new mapboxgl.LngLatBounds()
           activeRoute.coordinates.forEach((c) => bounds.extend(c))
@@ -424,7 +824,7 @@ export default function SafeCommute() {
       }
       if (map.isStyleLoaded()) render(); else map.once("load", render)
     })
-  }, [routes, selectedRouteId, safePoints, riskZones, showSafePoints, showRiskZones, activeRoute, isMapReady])
+  }, [routes, selectedRouteId, safePoints, riskZones, showSafePoints, showRiskZones, activeRoute, isMapReady, selectedIncident])
 
   // ── Action handlers ─────────────────────────────────────────────────
   const handleSelectOriginPlace = (place) => {
@@ -558,61 +958,20 @@ export default function SafeCommute() {
     setMobileStep("map")
   }
 
-  // ── MOCK routes for recommendations screen (3 routes) ───────────────
-  const mockRecommendationRoutes = [
-    {
-      id: "rec-route-1",
-      label: "Rute Teraman",
-      recommended: true,
-      riskLabel: "Risiko Rendah",
-      riskColor: "#16a34a",
-      riskBg: "#dcfce7",
-      duration: "16 Menit",
-      safePoints: "7 titik aman",
-      distance: "5 KM",
-      coordinates: [[106.822, -6.200], [106.825, -6.205], [106.830, -6.210]],
-    },
-    {
-      id: "rec-route-2",
-      label: "Rute Tercepat",
-      recommended: false,
-      riskLabel: "Risiko Sedang",
-      riskColor: "#d97706",
-      riskBg: "#fef3c7",
-      duration: "10 Menit",
-      safePoints: "5 titik aman",
-      distance: "3 KM",
-      coordinates: [[106.822, -6.200], [106.828, -6.202], [106.830, -6.210]],
-    },
-    {
-      id: "rec-route-3",
-      label: "Jalan Alternatif",
-      recommended: false,
-      riskLabel: "Risiko Tinggi",
-      riskColor: "#dc2626",
-      riskBg: "#fee2e2",
-      duration: "12 Menit",
-      safePoints: "2 titik aman",
-      distance: "4 KM",
-      coordinates: [[106.822, -6.200], [106.824, -6.208], [106.830, -6.210]],
-    },
-  ]
-
-  // use real routes from routeData when available, else mock
-  const recommendationRoutes = routes.length >= 2
-    ? routes.slice(0, 3).map((r, i) => ({
-        id: r.id,
-        label: i === 0 ? "Rute Teraman" : i === 1 ? "Rute Tercepat" : "Jalan Alternatif",
-        recommended: i === 0,
-        riskLabel: r.riskLevel === "Rendah" ? "Risiko Rendah" : r.riskLevel === "Sedang" ? "Risiko Sedang" : "Risiko Tinggi",
-        riskColor: r.riskLevel === "Rendah" ? "#16a34a" : r.riskLevel === "Sedang" ? "#d97706" : "#dc2626",
-        riskBg: r.riskLevel === "Rendah" ? "#dcfce7" : r.riskLevel === "Sedang" ? "#fef3c7" : "#fee2e2",
-        duration: r.duration,
-        safePoints: `${r.safePointsCount} titik aman`,
-        distance: r.distance,
-        coordinates: r.coordinates,
-      }))
-    : mockRecommendationRoutes
+  // sinkronisasi rute rekomendasi dengan daftar routes
+  const recommendationRoutes = routes.slice(0, 3).map((r, i) => ({
+    id: r.id,
+    label: r.title || (i === 0 ? "Rute Teraman" : i === 1 ? "Rute Tercepat" : "Jalan Alternatif"),
+    recommended: i === 0,
+    riskLabel: r.riskLevel === "Rendah" ? "Risiko Rendah" : r.riskLevel === "Sedang" ? "Risiko Sedang" : "Risiko Tinggi",
+    riskColor: r.riskLevel === "Rendah" ? "#16a34a" : r.riskLevel === "Sedang" ? "#d97706" : "#dc2626",
+    riskBg: r.riskLevel === "Rendah" ? "#dcfce7" : r.riskLevel === "Sedang" ? "#fef3c7" : "#fee2e2",
+    safetyScore: r.safetyScore ?? (r.riskLevel === "Rendah" ? 90 : r.riskLevel === "Sedang" ? 68 : 45),
+    duration: r.duration || (i === 0 ? "16 Menit" : i === 1 ? "11 Menit" : "14 Menit"),
+    safePoints: `${r.safePointsCount || (i === 0 ? 7 : i === 1 ? 4 : 2)} titik aman`,
+    distance: r.distance || (i === 0 ? "5.2 km" : i === 1 ? "4.1 km" : "4.8 km"),
+    coordinates: r.coordinates,
+  }))
 
   // ════════════════════════════════════════════════════════════════════
   // ALUR 1 — HOME: Gojek-style destination input
@@ -634,7 +993,7 @@ export default function SafeCommute() {
   // ════════════════════════════════════════════════════════════════════
   const renderFlowScreen = () => {
     if (mobileStep === "home") return (
-      <div className="h-full overflow-y-auto w-full bg-white flex flex-col pb-20">
+      <div className="h-full overflow-y-auto w-full bg-white flex flex-col pb-8">
         {/* pink gradient header */}
         <div className="bg-gradient-to-b from-[#e8195a] to-[#f43f7a] text-white pt-10 pb-16 px-5 relative overflow-hidden rounded-b-[36px]">
           <div className="absolute top-0 right-0 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
@@ -696,16 +1055,16 @@ export default function SafeCommute() {
   // ALUR 2 — SET LOKASI: editable origin + destination
   // ════════════════════════════════════════════════════════════════════
     if (mobileStep === "set-location") return (
-      <div className="h-full overflow-y-auto w-full bg-white flex flex-col">
+      <div className="h-full w-full bg-white flex flex-col overflow-hidden">
         {/* top bar */}
-        <div className="flex items-center gap-3 px-4 pt-12 pb-4">
+        <div className="flex items-center gap-3 px-4 pt-12 pb-4 shrink-0">
           <button type="button" onClick={() => setMobileStep("home")} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-pink-50 transition-colors">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold text-gray-900">Set Lokasi</h1>
         </div>
 
-        <div className="flex-1 px-4 flex flex-col gap-4 overflow-y-auto pb-32">
+        <div className="flex-1 px-4 flex flex-col gap-4 overflow-y-auto pb-4">
           {/* greeting */}
           <p className="text-base font-semibold text-gray-800">Kamu lagi ada dimana, Klee?</p>
 
@@ -782,8 +1141,8 @@ export default function SafeCommute() {
           </div>
         </div>
 
-        {/* sticky bottom CTA */}
-        <div className="sticky bottom-0 left-0 right-0 px-4 pb-8 pt-3 bg-white border-t border-gray-100 shadow-xl">
+        {/* sticky bottom CTA — tepat di atas mobile bottom nav */}
+        <div className="p-4 bg-white border-t border-gray-100 shadow-xl shrink-0 z-20">
           <Button
             type="button"
             variant="primary"
@@ -837,20 +1196,20 @@ export default function SafeCommute() {
   // ALUR 3 — LOADING: Mencari Rute Aman
   // ════════════════════════════════════════════════════════════════════
     if (mobileStep === "loading") return (
-      <div className="h-full overflow-y-auto w-full bg-white flex flex-col">
+      <div className="h-full overflow-y-auto w-full bg-white flex flex-col pb-8">
         {/* top bar */}
-        <div className="flex items-center gap-3 px-4 pt-12 pb-4">
+        <div className="flex items-center gap-3 px-4 pt-12 pb-4 shrink-0">
           <button type="button" onClick={() => setMobileStep("set-location")} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold text-gray-900">Mencari Rute Aman</h1>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-start px-6 pt-6 gap-6">
+        <div className="flex-1 flex flex-col items-center justify-start px-6 pt-2 pb-6 gap-4">
           {/* map illustration — using asset */}
-          <div className="w-48 h-48 flex items-center justify-center relative mb-2">
+          <div className="w-36 h-36 flex items-center justify-center relative mb-1 shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/load-image.svg" alt="Mencari rute aman" className="w-full h-full object-contain p-3" />
+            <img src="/assets/load-image.svg" alt="Mencari rute aman" className="w-full h-full object-contain p-2" />
           </div>
 
           {/* heading */}
@@ -909,9 +1268,9 @@ export default function SafeCommute() {
     // ALUR 4 — REKOMENDASI RUTE
     // ════════════════════════════════════════════════════════════════════
     if (mobileStep === "recommendations") return (
-      <div className="h-full overflow-y-auto w-full bg-white flex flex-col">
+      <div className="h-full overflow-y-auto w-full bg-white flex flex-col pb-8">
         {/* top bar */}
-        <div className="flex items-center gap-3 px-4 pt-12 pb-4 border-b border-gray-100">
+        <div className="flex items-center gap-3 px-4 pt-12 pb-4 border-b border-gray-100 shrink-0">
           <button type="button" onClick={() => setMobileStep("set-location")} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -967,7 +1326,7 @@ export default function SafeCommute() {
                     variant={route.riskLabel === "Risiko Rendah" ? "pink" : route.riskLabel === "Risiko Sedang" ? "yellow" : "red"}
                     className="text-[11px] font-semibold px-3 h-6 shrink-0"
                   >
-                    {route.riskLabel === "Risiko Rendah" ? `Aman ${route.safetyScore}%` : route.riskLabel === "Risiko Sedang" ? `Sedang ${route.safetyScore}%` : `Bahaya ${route.safetyScore}%`}
+                    {route.riskLabel === "Risiko Rendah" ? `Aman ${route.safetyScore ?? 92}%` : route.riskLabel === "Risiko Sedang" ? `Sedang ${route.safetyScore ?? 68}%` : `Bahaya ${route.safetyScore ?? 45}%`}
                   </Badge>
                 </div>
 
@@ -1027,7 +1386,7 @@ export default function SafeCommute() {
 
       {/* flow overlay — Alur 1-4 (home / set-location / loading / recommendations) */}
       {showFlowOverlay && (
-        <div className="absolute inset-0 z-50 bg-white">
+        <div className="absolute top-0 left-0 right-0 bottom-[60px] md:bottom-0 z-50 bg-white flex flex-col overflow-hidden">
           {renderFlowScreen()}
         </div>
       )}
@@ -1304,6 +1663,14 @@ export default function SafeCommute() {
           </div>
         </div>
       )}
+
+      {/* drawer detail insiden hotspot */}
+      <IncidentDetailDrawer
+        incident={selectedIncident ? enrichHeatmapIncident(selectedIncident) : null}
+        isOpen={!!selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+        onOpenReport={() => router.push("/report")}
+      />
     </div>
   )
 }

@@ -57,6 +57,42 @@ export function InteractiveHeatmap() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [incidents, setIncidents] = useState(MOCK_HEATMAP_INCIDENTS)
 
+  // flag hydration localstorage
+  const isHydratedRef = useRef(false)
+
+  // load state dari localstorage saat mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_heatmap_state")
+      if (raw) {
+        const saved = JSON.parse(raw)
+        if (saved.selectedTimeRange) setSelectedTimeRange(saved.selectedTimeRange)
+        if (typeof saved.selectedTime === "string") setSelectedTime(saved.selectedTime)
+        if (typeof saved.searchQuery === "string") setSearchQuery(saved.searchQuery)
+      }
+    } catch (e) {
+      console.warn("Gagal membaca heatmap state dari localStorage:", e)
+    } finally {
+      isHydratedRef.current = true
+    }
+  }, [])
+
+  // simpan state ke localstorage saat berubah
+  useEffect(() => {
+    if (typeof window === "undefined" || !isHydratedRef.current) return
+    try {
+      const stateToSave = {
+        selectedTimeRange,
+        selectedTime,
+        searchQuery,
+      }
+      localStorage.setItem("sheltra_heatmap_state", JSON.stringify(stateToSave))
+    } catch (e) {
+      console.warn("Gagal menyimpan heatmap state ke localStorage:", e)
+    }
+  }, [selectedTimeRange, selectedTime, searchQuery])
+
   // filter data berdasarkan rentang waktu dan search query
   const displayIncidents = useMemo(() => {
     let list = incidents
@@ -614,7 +650,7 @@ export function InteractiveHeatmap() {
         </div>
 
         {/* floating bottom card legenda risiko di mobile */}
-        <div className="mt-auto w-full max-w-lg mx-auto pointer-events-auto flex flex-col items-end gap-2.5 pb-24">
+        <div className="mt-auto w-full max-w-lg mx-auto pointer-events-auto flex flex-col items-end gap-2.5 pb-14">
           <button
             type="button"
             onClick={() => router.push("/anonymous-report")}

@@ -119,13 +119,21 @@ export function TrustedContactsSection({
               {/* avatar bulat */}
               <div className="relative">
                 <div
-                  className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full border flex items-center justify-center shadow-xs transition-transform duration-150 group-hover:scale-105 ${
-                    contact.avatarBg || "bg-rose-100 text-rose-700 border-rose-200"
+                  className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full border flex items-center justify-center overflow-hidden shadow-xs transition-transform duration-150 group-hover:scale-105 ${
+                    contact.avatar?.bg || contact.avatarBg || "bg-[#FFE4E6]"
                   }`}
                 >
-                  <span className="font-bold text-xs sm:text-sm">
-                    {contact.avatarInitial || contact.name.substring(0, 2).toUpperCase()}
-                  </span>
+                  {contact.avatar?.url || contact.avatarImage ? (
+                    <img
+                      src={contact.avatar?.url || contact.avatarImage}
+                      alt={contact.name}
+                      className="w-11 h-11 sm:w-12 sm:h-12 object-contain"
+                    />
+                  ) : (
+                    <span className="font-bold text-xs sm:text-sm">
+                      {contact.avatarInitial || contact.name.substring(0, 2).toUpperCase()}
+                    </span>
+                  )}
                 </div>
 
                 {/* status dot siaga */}

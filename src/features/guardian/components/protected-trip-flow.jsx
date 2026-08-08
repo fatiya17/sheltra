@@ -40,6 +40,54 @@ export default function ProtectedTripFlow() {
   const [completedTimeStr, setCompletedTimeStr] = useState("18.47")
   const [overdueTimeStr, setOverdueTimeStr] = useState("18.02")
 
+  // flag hydration localstorage
+  const isHydratedRef = React.useRef(false)
+
+  // load saved trip state dari localstorage saat mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem("sheltra_guardian_trip")
+      if (raw) {
+        const saved = JSON.parse(raw)
+        if (saved.stage) setStage(saved.stage)
+        if (typeof saved.secondsLeft === "number") setSecondsLeft(saved.secondsLeft)
+        if (typeof saved.confirmSecondsLeft === "number") setConfirmSecondsLeft(saved.confirmSecondsLeft)
+        if (typeof saved.rating === "number") setRating(saved.rating)
+        if (typeof saved.notes === "string") setNotes(saved.notes)
+        if (saved.feedbackType) setFeedbackType(saved.feedbackType)
+      }
+    } catch (e) {
+      console.warn("Gagal membaca guardian trip state dari localStorage:", e)
+    } finally {
+      isHydratedRef.current = true
+    }
+  }, [])
+
+  // simpan trip state ke localstorage saat berubah
+  useEffect(() => {
+    if (typeof window === "undefined" || !isHydratedRef.current) return
+    try {
+      if (stage === "success") {
+        localStorage.removeItem("sheltra_guardian_trip")
+      } else {
+        const stateToSave = {
+          stage,
+          secondsLeft,
+          confirmSecondsLeft,
+          rating,
+          notes,
+          feedbackType,
+          originParam,
+          destinationParam,
+        }
+        localStorage.setItem("sheltra_guardian_trip", JSON.stringify(stateToSave))
+      }
+    } catch (e) {
+      console.warn("Gagal menyimpan guardian trip state ke localStorage:", e)
+    }
+  }, [stage, secondsLeft, confirmSecondsLeft, rating, notes, feedbackType, originParam, destinationParam])
+
   useEffect(() => {
     const now = new Date()
     const hours = now.getHours().toString().padStart(2, "0")
